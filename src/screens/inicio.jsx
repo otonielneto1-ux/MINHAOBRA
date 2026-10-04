@@ -3,26 +3,68 @@
 import { useObra } from '../lib/ObraContext.jsx'
 import * as dados from '../lib/dados.js'
 import { resumoAvanco, curvaS } from '../lib/avanco.js'
-import { ppc } from '../lib/pcp.js'
-import { montarAlertas } from '../lib/alertas.js'
+import { META_PPC, ppcAte, ppcDoMes, tomPpc } from '../lib/pcp.js'
+import { contarCriticos, montarAlertas, ocorrenciasDoCliente } from '../lib/alertas.js'
 import { efetivoTerceirizadas } from '../lib/efetivo.js'
-import { mesesEntre, segundaDaSemana, somarDias, dataBr, nomeDiaLongo } from '../lib/datas.js'
-import { porcento, pontos, quantidade, numero } from '../lib/formato.js'
+import { inicioDoMesAnterior, mesesEntre, nomeMes, segundaDaSemana, somarDias, dataBr, diaMes, nomeDiaLongo } from '../lib/datas.js'
+import { porcento, pontos, quantidade, numero, saudacao } from '../lib/formato.js'
 import { TIPOS_MAO_OBRA } from '../lib/vocabulario.js'
-import { Barra, Caixa, Cabecalho, Carregando, CurvaS, ErroCaixa, Secao, Vazio, useCarga } from '../components/index.jsx'
+import { pode } from '../lib/permissoes.js'
+import { Barra, Caixa, Cabecalho, Carregando, CurvaS, ErroCaixa, Icone, Secao, Status, Vazio, useCarga } from '../components/index.jsx'
+import { Capa } from '../components/capa.jsx'
 
 async function carregarPainel(dia) {
   const segunda = segundaDaSemana(dia)
   const r = await Promise.all([
     dados.listarServicos(), dados.listarProducoes(), dados.listarEtapas(),
-    dados.listarAtividades({ de: segunda, ate: somarDias(segunda, 5) }),
+    // do mês anterior até o fim desta semana: PPC da semana, do mês e a comparação
+    dados.listarAtividades({ de: inicioDoMesAnterior(dia), ate: somarDias(segunda, 5) }),
     dados.listarPresencas({ data: dia }), dados.listarFuncionarios(),
-    dados.listarPacotes(), dados.listarRestricoes(), dados.listarOcorrencias(),
+    dados.listarPacotes(), dados.listarRestricoes(), dados.listarOcorrencias(), dados.listarPessoas(),
   ])
   const erro = r.find((x) => x.erro)?.erro
   if (erro) return { data: null, erro }
-  const [servicos, producoes, etapas, atividades, presencas, funcionarios, pacotes, restricoes, ocorrencias] = r.map((x) => x.data)
-  return { data: { servicos, producoes, etapas, atividades, presencas, funcionarios, pacotes, restricoes, ocorrencias }, erro: null }
+  const [servicos, producoes, etapas, atividades, presencas, funcionarios, pacotes, restricoes, ocorrencias, pessoas] = r.map((x) => x.data)
+  return { data: { segunda, servicos, producoes, etapas, atividades, presencas, funcionarios, pacotes, restricoes, ocorrencias, pessoas }, erro: null }
+}
+
+// PPC da semana e do mês, com a comparação com o mês anterior e a meta.
+function BlocoPpc({ semana, mes, abrir }) {
+  const pct = (p) => porcento(p, 0)
+  return (
+    <div className="ppc-bloco">
+      <div className="ppc-dois">
+        <div>
+          <div className="lab">PPC da semana</div>
+          <div className={`ppc-valor num t-${tomPpc(semana.pct)}`}>{pct(semana.pct)}</div>
+          <div className="meta">{semana.concluidas} de {semana.base} concluídas</div>
+        </div>
+        <div>
+          <div className="lab">PPC de {nomeMes(mes.mes)}</div>
+          <div className={`ppc-valor num t-${tomPpc(mes.atual.pct)}`}>{pct(mes.atual.pct)}</div>
+          <div className="meta">
+            {mes.atual.concluidas} de {mes.atual.base} no mês · {nomeMes(mes.mesAnterior)} {pct(mes.anterior.pct)}
+            {!!mes.variacao && <span className={mes.variacao > 0 ? 'sobe' : 'desce'}> {mes.variacao > 0 ? '▲' : '▼'} {Math.abs(mes.variacao)} pts</span>}
+          </div>
+        </div>
+      </div>
+      {mes.abaixoDaMeta !== null && (
+        <div style={{ margin: '12px 0 4px' }}>
+          <Status tom={tomPpc(mes.atual.pct)}>{mes.abaixoDaMeta === 0 ? `Mês na meta de ${META_PPC}%` : `Mês ${mes.abaixoDaMeta} pontos abaixo da meta de ${META_PPC}%`}</Status>
+        </div>
+      )}
+      <div className="ppc-semanas">
+        {mes.semanas.map((s) => (
+          <div key={s.semana_inicio} className="ppc-sem">
+            <span className="lab">Sem. {diaMes(s.semana_inicio)}</span>
+            <Barra pct={s.pct ?? 0} marco={META_PPC} tom={tomPpc(s.pct)} />
+            <b className="num">{pct(s.pct)}</b>
+          </div>
+        ))}
+      </div>
+      <button className="btn btn-bloco" style={{ marginTop: 12 }} onClick={abrir}>Abrir a semana</button>
+    </div>
+  )
 }
 
 export default function Inicio({ goto, usuario }) {
@@ -33,14 +75,15 @@ export default function Inicio({ goto, usuario }) {
   if (carregando && !data) return <Carregando />
   if (erro) return <ErroCaixa erro={erro} tentarDeNovo={recarregar} />
 
-  const { servicos, producoes, etapas, atividades, presencas, funcionarios, pacotes, restricoes, ocorrencias } = data
+  const { segunda, servicos, producoes, etapas, atividades, presencas, funcionarios, pacotes, restricoes, ocorrencias, pessoas } = data
   const primeiroNome = usuario.nome.split(' ')[0]
-  const cabecalho = <Cabecalho rotulo={`Painel do dia · ${nomeDiaLongo(dia)}, ${dataBr(dia)}`} titulo={`Bom dia, ${primeiroNome}`} />
+  const cabecalho = <Cabecalho rotulo={`Painel do dia · ${nomeDiaLongo(dia)}, ${dataBr(dia)}`} titulo={`${saudacao(dados.horaAgora())}, ${primeiroNome}`} />
 
   if (!servicos.some((s) => !s.e_resumo)) {
     return (
       <>
         {cabecalho}
+        <Capa editar={() => goto('cadastros', { aba: 'obra' })} />
         <Vazio icone="planejamento" titulo="Ainda não há cronograma nesta obra"
           texto="Importe o arquivo do MS Project para começar. Depois disso o painel mostra o avanço, as atividades e os alertas."
           acao={{ texto: 'Importar do Project', fn: () => goto('importar') }} />
@@ -53,7 +96,8 @@ export default function Inicio({ goto, usuario }) {
   const curva = curvaS(servicos, producoes, mesesEntre(obra.data_inicio, obra.data_fim_contrato), dia)
   const deHoje = atividades.filter((a) => a.data_prevista === dia)
   const nomeServico = (id) => servicos.find((s) => s.id === id)
-  const semana = ppc(atividades)
+  const semana = ppcAte(atividades.filter((a) => a.semana_inicio === segunda), dia)
+  const mes = ppcDoMes(atividades, dia)
 
   const funcPorId = new Map(funcionarios.map((f) => [f.id, f]))
   const presentes = presencas.filter((p) => p.situacao === 'Presente').map((p) => funcPorId.get(p.funcionario_id))
@@ -61,12 +105,14 @@ export default function Inicio({ goto, usuario }) {
   const terceirizadas = efetivoTerceirizadas(funcionarios, presencas)
   const porFuncao = Object.entries(presentes.reduce((m, f) => ({ ...m, [f.funcao]: (m[f.funcao] || 0) + 1 }), {})).sort((a, b) => b[1] - a[1])
 
-  const alertas = montarAlertas({ servicos, pacotes, restricoes, ocorrencias, efetivoLancado: presencas.length > 0, hoje: dia })
-  const criticos = alertas.filter((a) => a.nivel === 'crit').length
+  const doCliente = ocorrenciasDoCliente(ocorrencias, pessoas, dia)
+  const alertas = montarAlertas({ servicos, pacotes, restricoes, ocorrencias, pessoas, efetivoLancado: presencas.length > 0, hoje: dia })
+  const criticos = contarCriticos(alertas, doCliente)
 
   return (
     <>
       {cabecalho}
+      <Capa editar={pode(usuario.role, 'gerirCadastros') ? () => goto('cadastros', { aba: 'obra' }) : null} />
 
       <div className="kpis">
         <button className="kpi" onClick={() => goto('planejamento', { aba: 'cronograma' })}>
@@ -75,8 +121,9 @@ export default function Inicio({ goto, usuario }) {
         <button className="kpi" onClick={() => goto('efetivo')}>
           <b className="num">{presentes.length}</b><span className="lab">Pessoas no canteiro</span>
         </button>
-        <button className={`kpi ${semana.pct !== null && semana.pct < 80 ? 'warn' : ''}`} onClick={() => goto('planejamento', { aba: 'semana' })}>
-          <b className="num">{semana.pct ?? '—'}{semana.pct !== null && <small>%</small>}</b><span className="lab">PPC da semana</span>
+        <button className={`kpi ${tomPpc(semana.pct)}`} onClick={() => goto('planejamento', { aba: 'semana' })}>
+          <b className="num">{semana.pct ?? '—'}{semana.pct !== null && <small>%</small>}</b>
+          <span className="lab">PPC da semana · {nomeMes(dia)} {porcento(mes.atual.pct, 0)}</span>
         </button>
         <div className={`kpi ${criticos ? 'crit' : 'ok'}`}>
           <b className="num">{criticos}</b><span className="lab">Alertas críticos</span>
@@ -108,8 +155,32 @@ export default function Inicio({ goto, usuario }) {
           )}
         </Secao>
 
-        <Secao className="span-5" rotulo={`Alertas · ${alertas.length}`}>
-          {alertas.length === 0 && <p className="vazio-curto">Nenhum alerta hoje.</p>}
+        <Secao className="span-5" rotulo={`Alertas · ${alertas.length + doCliente.length}`}>
+          {doCliente.length > 0 && (
+            <div className="destaque" role="group" aria-label="Ocorrências do cliente">
+              <div className="destaque-topo">
+                <Icone nome="ocorrencias" />
+                <span className="lab lab-ink">Ocorrências do cliente · {doCliente.length} {doCliente.length === 1 ? 'aberta' : 'abertas'}</span>
+                <button className="link" onClick={() => goto('ocorrencias')}>Ver todas</button>
+              </div>
+              <div className="lista">
+                {doCliente.map((o) => (
+                  <button key={o.id} className="linha" onClick={() => goto('ocorrencia', { id: o.id })}>
+                    <span className="destaque-num num">nº {o.numero}</span>
+                    <div className="linha-main">
+                      <div className="linha-titulo">{o.titulo}</div>
+                      <div className={`meta ${o.urgente ? 'crit' : ''}`}>
+                        {o.status}
+                        {o.semResposta ? ` · sem resposta há ${o.dias} dias` : ''}
+                        {o.prazo ? ` · prazo ${diaMes(o.prazo)}${o.prazoVencido ? ' vencido' : ''}` : ''}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {alertas.length === 0 && doCliente.length === 0 && <p className="vazio-curto">Nenhum alerta hoje.</p>}
           <div className="lista">
             {alertas.map((a, i) => (
               <button key={i} className="linha" onClick={() => goto(a.destino.screen, a.destino.params)}>
@@ -140,10 +211,7 @@ export default function Inicio({ goto, usuario }) {
               )
             })}
           </div>
-          <div className="caixa-rodape">
-            <div><div className="lab">PPC da semana até agora</div><div className="v num">{semana.pct ?? '—'}{semana.pct !== null && '%'} <span className="lab">· {semana.concluidas} de {semana.base}</span></div></div>
-            <button className="btn" onClick={() => goto('planejamento', { aba: 'semana' })}>Abrir</button>
-          </div>
+          <BlocoPpc semana={semana} mes={mes} abrir={() => goto('planejamento', { aba: 'semana' })} />
         </Secao>
 
         <Secao className="span-5" rotulo="Efetivo de hoje" link={{ texto: presencas.length ? 'Editar' : 'Lançar', acao: () => goto('efetivo') }}>

@@ -2,6 +2,7 @@
 
 > Fonte da verdade deste projeto. Quando mudar de ideia, mude aqui primeiro.
 > Última atualização: 04/10/2026 — plano fechado com o Otoniel.
+> Construtora: **Solutio Engenharia**.
 > Obra modelo: **Conviver Costamare** (loteamento) — Parnaíba/PI. Cliente: **Conviver Urbanismo**, fiscal Breno Cavalcante.
 > Etapas de entrega da obra: **Geral**, **Fase 01** e **Fase 02**.
 > O sistema nasce com uma obra e já preparado para cadastrar outras.
@@ -65,9 +66,16 @@ O cronograma da obra (serviços, datas e predecessoras) é importado do MS Proje
 
 ## Funcionalidades (Versão 1)
 
+### 0. Capa da obra (todos os perfis)
+- **Onde:** no topo da tela inicial de cada perfil (Início, Hoje, Avanço do cliente, Planejamento do técnico de segurança).
+- **Mostra:** foto da obra com o nome por cima; ao lado, **só as imagens** das logos do cliente e da construtora (Solutio Engenharia), sem texto.
+- **Sem imagem:** a foto vira um quadriculado de prancheta; a logo vira as iniciais (CU, SE).
+- **Quem troca:** engenheiro e coordenador, em Cadastros › Obra e etapas (enviar, trocar, remover). A foto da obra e a logo do cliente são de cada obra; a logo e o nome da construtora valem para todas.
+- **Arquivo:** JPG, PNG ou WEBP até 15 MB; a foto é reduzida para 1200 px, as logos para 600 px (PNG mantém o fundo transparente).
+
 ### 1. Painel do dia (Início)
 - **Abre em:** painel com blocos; no celular, empilhados.
-- **Mostra:** (1) avanço físico realizado x previsto para hoje, geral e por etapa de entrega (Geral, Fase 01, Fase 02); (2) atividades do PCP de hoje; (3) efetivo do dia: total, por tipo (Direta, Indireta, Terceirizada) e por função; (4) PPC da semana até agora; (5) alertas: serviço crítico atrasado, pacote a menos de 5 dias do fechamento abaixo de 70% da meta, restrição vencida, ocorrência sem resposta há mais de 48 h, efetivo de hoje não lançado.
+- **Mostra:** (1) avanço físico realizado x previsto para hoje, geral e por etapa de entrega (Geral, Fase 01, Fase 02); (2) atividades do PCP de hoje; (3) efetivo do dia: total, por tipo (Direta, Indireta, Terceirizada), por função e por empresa terceirizada; (4) PPC da semana e PPC do mês, comparado com o mês anterior e com a meta, e o PPC de cada semana do mês; (5) alertas, com as ocorrências abertas pelo cliente em destaque no topo; depois: serviço crítico atrasado, pacote a menos de 5 dias do fechamento abaixo de 70% da meta, restrição vencida, ocorrência sem resposta há mais de 48 h, efetivo de hoje não lançado.
 - **Ações:** só leitura; cada bloco leva ao seu módulo.
 - **Vazio:** "Ainda não há cronograma nesta obra. Importe o arquivo do MS Project para começar."
 
@@ -91,6 +99,7 @@ O cronograma da obra (serviços, datas e predecessoras) é importado do MS Proje
 - **Mostra:** serviço, local, quantidade planejada, equipe, pacote (se houver), status, quantidade executada.
 - **Baixa:** o mestre informa o executado (em % do serviço ou na unidade, conforme o serviço); se for igual ou maior que a planejada a atividade fica **Concluída**, se for menor fica **Não concluída** e o motivo é obrigatório (Chuva, Falta de material, Falta de equipe, Projeto, Equipamento, Frente não liberada, Outro).
 - **Indicadores:** PPC da semana e gráfico dos motivos de não conclusão das últimas 8 semanas.
+- **Regra do PPC (única no app):** concluídas ÷ atividades que contam. Dia que já passou sem baixa conta como não concluído; hoje só conta depois da baixa; futuro não conta.
 - **Ações:** montar a semana (engenheiro/coordenador), copiar pendentes para a semana seguinte, dar baixa (mestre, engenheiro, coordenador).
 - **Vazio:** "Semana sem atividades planejadas."
 - **Nasce e morre:** a semana é montada até sexta para a seguinte (proposta); o mestre corrige a baixa até o fim do dia seguinte; depois disso só engenheiro ou coordenador.
@@ -120,7 +129,7 @@ O cronograma da obra (serviços, datas e predecessoras) é importado do MS Proje
 - **Ações:** o cliente abre com fotos; engenheiro e coordenador atribuem, respondem e fecham.
 
 ### 8. Cadastros
-- Obra e etapas de entrega (com data contratual de cada uma), funcionários, usuários (liberar, escolher perfil e obra).
+- Obra e etapas de entrega (com data contratual de cada uma), imagens da capa e nome da construtora, funcionários, usuários (liberar, escolher perfil e obra).
 
 ## Perfis de usuário
 
@@ -282,7 +291,7 @@ Login · Criar conta · Conta aguardando liberação
 
 ## Modelagem de dados
 
-15 tabelas: `profiles`, `obras`, `obra_usuarios`, `etapas_entrega`, `servicos`, `servico_dependencias`, `restricoes`, `funcionarios`, `presencas`, `pacotes`, `premios`, `pcp_atividades`, `producoes`, `ocorrencias`, `ocorrencia_fotos`. Detalhe campo a campo em `PRD-BACKEND.md`.
+16 tabelas: `profiles`, `config` (uma linha: nome e logo da construtora), `obras`, `obra_usuarios`, `etapas_entrega`, `servicos`, `servico_dependencias`, `restricoes`, `funcionarios`, `presencas`, `pacotes`, `premios`, `pcp_atividades`, `producoes`, `ocorrencias`, `ocorrencia_fotos`. Detalhe campo a campo em `PRD-BACKEND.md`.
 
 Maior que o normal para uma primeira versão (o guia é até 7). Foi mantido porque caminho crítico, PCP e prêmio não funcionam com menos. Se o prazo apertar, o primeiro corte é a tabela `restricoes` (o plano de 3 meses continua, sem as restrições).
 
@@ -313,5 +322,6 @@ Maior que o normal para uma primeira versão (o guia é até 7). Foi mantido por
 
 - `[DESCOBRIR NO USO: dia de montar o PCP]` — por enquanto: a semana é montada até sexta para a semana seguinte.
 - `[DESCOBRIR NO USO: prazo para o mestre corrigir lançamentos]` — por enquanto: até o fim do dia seguinte.
+- `[DESCOBRIR NO USO: meta de PPC]` — por enquanto: 80% (verde na meta, âmbar até 20 pontos abaixo, vermelho abaixo disso).
 - `[DESCOBRIR NO USO: limites dos alertas]` — por enquanto: pacote a menos de 5 dias do fechamento abaixo de 70% da meta; ocorrência sem resposta há 48 h.
 - `[DESCOBRIR NO USO: divisão do prêmio]` — por enquanto: proporcional aos dias de presença, só funcionários próprios, só com 100% da meta.

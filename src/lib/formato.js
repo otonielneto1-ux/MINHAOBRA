@@ -23,6 +23,13 @@ export function moeda(v) {
   return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
+// Saudação pela hora do dia (0 a 23).
+export function saudacao(hora) {
+  if (hora >= 5 && hora < 12) return 'Bom dia'
+  if (hora >= 12 && hora < 18) return 'Boa tarde'
+  return 'Boa noite'
+}
+
 // Diferença em pontos percentuais com sinal: "−3,4 p.p." / "+1,2 p.p."
 export function pontos(v) {
   const s = v < 0 ? '−' : '+'

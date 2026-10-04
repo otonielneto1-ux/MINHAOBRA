@@ -1,7 +1,7 @@
 // Regras do PCP (planejamento da semana). PLANO-DO-PROJETO.md, "4a. PCP".
 
 import { STATUS_PCP } from './vocabulario.js'
-import { diasEntre } from './datas.js'
+import { diasEntre, inicioDoMesAnterior } from './datas.js'
 
 // Decide o resultado de uma baixa. Devolve { status, motivo } ou { erro }.
 export function resultadoBaixa(planejada, executada, motivo) {
@@ -14,14 +14,44 @@ export function resultadoBaixa(planejada, executada, motivo) {
   return { status: STATUS_PCP.NAO_CONCLUIDA, motivo }
 }
 
-// PPC = atividades concluídas ÷ atividades que já tiveram baixa.
-// Semana encerrada: o que ficou sem baixa conta como não concluído.
-export function ppc(atividades, encerrada = false) {
-  const concluidas = atividades.filter((a) => a.status === STATUS_PCP.CONCLUIDA).length
-  const base = encerrada
-    ? atividades.length
-    : atividades.filter((a) => a.status !== STATUS_PCP.PLANEJADA).length
-  return { concluidas, base, pct: base ? Math.round((concluidas / base) * 100) : null }
+// Meta de PPC (proposta; "Decidir depois de usar").
+export const META_PPC = 80
+
+// Cor do PPC: na meta = ok; até 20 pontos abaixo = atenção; mais que isso = crítico.
+export function tomPpc(pct) {
+  if (pct === null || pct === undefined) return 'neutral'
+  if (pct >= META_PPC) return 'ok'
+  if (pct >= META_PPC - 20) return 'warn'
+  return 'crit'
+}
+
+// PPC — a única regra do app (Início, Semana, histórico):
+// dia que já passou sem baixa conta como não concluído; hoje só conta se já teve baixa; futuro não conta.
+export function ppcAte(atividades, hoje) {
+  const contam = atividades.filter((a) => a.data_prevista < hoje || (a.data_prevista === hoje && a.status !== STATUS_PCP.PLANEJADA))
+  const concluidas = contam.filter((a) => a.status === STATUS_PCP.CONCLUIDA).length
+  return { concluidas, base: contam.length, pct: contam.length ? Math.round((concluidas / contam.length) * 100) : null }
+}
+
+// PPC do mês de `hoje` (soma de todas as atividades com data no mês), o do mês anterior,
+// a variação em pontos, quanto falta para a meta e o PPC de cada semana que toca o mês
+// (semana inteira, para bater com a tela Semana).
+export function ppcDoMes(atividades, hoje) {
+  const mes = hoje.slice(0, 7)
+  const anterior = inicioDoMesAnterior(hoje).slice(0, 7)
+  const doMes = atividades.filter((x) => x.data_prevista.slice(0, 7) === mes)
+  const atual = ppcAte(doMes, hoje)
+  const passado = ppcAte(atividades.filter((x) => x.data_prevista.slice(0, 7) === anterior), hoje)
+  const semanas = [...new Set(doMes.map((x) => x.semana_inicio))].sort()
+  return {
+    mes,
+    mesAnterior: anterior,
+    atual,
+    anterior: passado,
+    variacao: atual.pct !== null && passado.pct !== null ? atual.pct - passado.pct : null,
+    abaixoDaMeta: atual.pct === null ? null : Math.max(0, META_PPC - atual.pct),
+    semanas: semanas.map((s) => ({ semana_inicio: s, ...ppcAte(atividades.filter((x) => x.semana_inicio === s), hoje) })),
+  }
 }
 
 // O mestre só mexe numa baixa até o fim do dia seguinte à data da atividade.

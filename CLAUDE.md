@@ -77,6 +77,11 @@ e a Vercel publica sozinha. Ele não digita comando: o agente roda npm e git na 
   `toISOString().split('T')[0]` pula um dia no fuso do Brasil.
 - **"Fase 01 / Fase 02" são etapas de entrega da obra**; as fases do sistema são "Versão 1 / Versão 2".
 - O mock guarda as mudanças só na memória: recarregar a página volta ao estado inicial.
+  **Exceção:** as imagens da capa e o nome da construtora ficam no `localStorage` do navegador
+  (chaves `minhaobra:obra:<id>:...` e `minhaobra:config:...`), para sobreviver ao recarregar.
+  No banco, isso vira Storage + colunas `obras.foto_obra`, `obras.logo_cliente` e a tabela `config`.
+- Compressão de imagem usa canvas, então mora em `src/components/imagem.js`; as regras puras
+  (tipo, tamanho, medidas, iniciais) ficam em `src/lib/imagem.js`, com teste.
 
 ## Higiene de código (vale para toda mudança)
 

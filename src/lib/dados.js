@@ -25,6 +25,11 @@ export function hoje() {
   return USAR_MOCK ? HOJE_MOCK : paraIso(new Date())
 }
 
+// Hora do aparelho (a saudação usa a hora real mesmo no modo exemplo).
+export function horaAgora() {
+  return new Date().getHours()
+}
+
 const ok = (data) => Promise.resolve({ data: structuredClone(data), erro: null })
 const falha = (erro) => Promise.resolve({ data: null, erro })
 const role = () => usuarioAtual?.role
@@ -47,6 +52,62 @@ export function listarMinhasObras() {
   if (u.role === 'Engenheiro') return ok(mock.obras)
   const ids = mock.obra_usuarios.filter((x) => x.profile_id === u.id).map((x) => x.obra_id)
   return ok(mock.obras.filter((o) => ids.includes(o.id)))
+}
+
+// ── Capa: foto da obra e logos (todos os perfis veem) ───────────────────
+// No modo exemplo as imagens ficam também no navegador (localStorage), para
+// sobreviver ao recarregar. A chave leva o id da obra. No banco, vão para o Storage.
+const CHAVE = { foto_obra: (id) => `minhaobra:obra:${id}:foto_obra`, logo_cliente: (id) => `minhaobra:obra:${id}:logo_cliente`, logo_construtora: () => 'minhaobra:config:logo_construtora' }
+const CHAVE_NOME_CONSTRUTORA = 'minhaobra:config:nome_construtora'
+
+function lerGuardado(chave) {
+  try { return window.localStorage.getItem(chave) } catch { return null }
+}
+function guardar(chave, valor) {
+  try {
+    if (valor === null) window.localStorage.removeItem(chave)
+    else window.localStorage.setItem(chave, valor)
+    return null
+  } catch {
+    return 'Não coube no navegador. Tente uma imagem menor.'
+  }
+}
+
+if (USAR_MOCK) {
+  for (const o of mock.obras) {
+    o.foto_obra = lerGuardado(CHAVE.foto_obra(o.id)) || o.foto_obra
+    o.logo_cliente = lerGuardado(CHAVE.logo_cliente(o.id)) || o.logo_cliente
+  }
+  mock.config.logo_construtora = lerGuardado(CHAVE.logo_construtora()) || mock.config.logo_construtora
+  mock.config.nome_construtora = lerGuardado(CHAVE_NOME_CONSTRUTORA) || mock.config.nome_construtora
+}
+
+export function buscarCapa() {
+  const o = mock.obras.find((x) => x.id === obraAtualId)
+  if (!o) return falha('Obra não encontrada.')
+  return ok({
+    obra: o.nome, local: `${o.cidade}/${o.uf}`, cliente: o.cliente, foto_obra: o.foto_obra, logo_cliente: o.logo_cliente,
+    construtora: mock.config.nome_construtora, logo_construtora: mock.config.logo_construtora,
+  })
+}
+
+// tipo: foto_obra | logo_cliente | logo_construtora. valor: imagem já comprimida, ou null para remover.
+export function salvarImagem(tipo, valor) {
+  if (!pode(role(), 'gerirCadastros')) return falha('Seu perfil não troca as imagens.')
+  if (!(tipo in CHAVE)) return falha('Imagem desconhecida.')
+  const erro = guardar(CHAVE[tipo](obraAtualId), valor)
+  if (erro) return falha(erro)
+  if (tipo === 'logo_construtora') mock.config.logo_construtora = valor
+  else mock.obras.find((x) => x.id === obraAtualId)[tipo] = valor
+  return ok(true)
+}
+
+export function salvarNomeConstrutora(nome) {
+  if (!pode(role(), 'gerirCadastros')) return falha('Seu perfil não altera a construtora.')
+  if (!nome?.trim()) return falha('Informe o nome da construtora.')
+  guardar(CHAVE_NOME_CONSTRUTORA, nome.trim())
+  mock.config.nome_construtora = nome.trim()
+  return ok(true)
 }
 
 export const listarEtapas = () =>

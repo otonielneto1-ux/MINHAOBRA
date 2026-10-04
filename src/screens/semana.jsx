@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useObra } from '../lib/ObraContext.jsx'
 import * as dados from '../lib/dados.js'
 import { pode } from '../lib/permissoes.js'
-import { ppc, contarMotivos, mestrePodeAlterar, resultadoBaixa } from '../lib/pcp.js'
+import { ppcAte, contarMotivos, mestrePodeAlterar, resultadoBaixa } from '../lib/pcp.js'
 import { diasDaSemana, diaMes, nomeDia, segundaDaSemana, somarDias } from '../lib/datas.js'
 import { quantidade } from '../lib/formato.js'
 import { MOTIVOS_NAO_CONCLUSAO, PERFIS } from '../lib/vocabulario.js'
@@ -29,6 +29,7 @@ export default function Semana({ usuario }) {
   const [segunda, setSegunda] = useState(segundaDaSemana(dia))
   const [diaSel, setDiaSel] = useState(dia)
   const [baixa, setBaixa] = useState(null)
+  const [verMotivos, setVerMotivos] = useState(false)
   const { data, erro, carregando, recarregar } = useCarga(() => carregarSemana(segunda), [obra.id, segunda])
 
   if (carregando && !data) return <Carregando />
@@ -37,7 +38,7 @@ export default function Semana({ usuario }) {
   const dias = diasDaSemana(segunda)
   const daSemana = data.atividades.filter((a) => a.semana_inicio === segunda)
   const encerrada = somarDias(segunda, 5) < dia
-  const indicador = ppc(daSemana, encerrada)
+  const indicador = ppcAte(daSemana, dia)
   const motivos = contarMotivos(data.atividades)
   const maxMotivo = Math.max(1, ...motivos.map((m) => m.total))
   const servico = (id) => data.servicos.find((s) => s.id === id)
@@ -125,7 +126,12 @@ export default function Semana({ usuario }) {
         </div>
       )}
 
-      <Secao className="chart" rotulo="Por que não concluímos · últimas 8 semanas">
+      <div className="so-curto">
+        <button className="btn btn-quiet btn-bloco" style={{ marginTop: 16 }} aria-expanded={verMotivos} onClick={() => setVerMotivos(!verMotivos)}>
+          {verMotivos ? 'Esconder motivos' : 'Ver motivos de não conclusão'}
+        </button>
+      </div>
+      <Secao className={`chart ${verMotivos ? '' : 'so-largo'}`} rotulo="Por que não concluímos · últimas 8 semanas">
         {motivos.length === 0 && <p className="vazio-curto">Nenhuma atividade deixou de ser concluída nesse período.</p>}
         {motivos.map((m) => (
           <div key={m.motivo} className="motivo"><span>{m.motivo}</span><Barra pct={(m.total / maxMotivo) * 100} /><b className="num">{m.total}</b></div>

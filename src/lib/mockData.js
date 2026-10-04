@@ -12,8 +12,12 @@ export const obras = [
     id: OBRA, nome: 'Conviver Costamare', cidade: 'Parnaíba', uf: 'PI', cliente: 'Conviver Urbanismo',
     data_inicio: '2026-03-02', data_fim_contrato: '2027-12-31', dia_fechamento_folha: 20,
     status: 'Em andamento', ultimo_calculo_em: '2026-10-07T07:30:00',
+    foto_obra: null, logo_cliente: null,
   },
 ]
+
+// Configuração geral (uma linha): vale para todas as obras.
+export const config = { id: 1, nome_construtora: 'Solutio Engenharia', logo_construtora: null }
 
 export const etapas_entrega = [
   { id: 1, obra_id: OBRA, nome: 'Geral', ordem: 1, data_entrega_contratual: '2027-06-30' },

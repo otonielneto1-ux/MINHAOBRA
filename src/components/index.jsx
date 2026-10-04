@@ -1,6 +1,6 @@
 // Peças reutilizáveis da interface. Nenhuma regra de negócio aqui.
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 
 // ── Ícones (traço fino, SVG inline) ──────────────────────────────────────
 const P = {
@@ -127,16 +127,25 @@ export function useCarga(carregar, deps = []) {
 
 // ── Folha (janela por cima da tela; no celular sobe de baixo) ────────────
 export function Folha({ aberta, fechar, children, rotulo }) {
+  const caixa = useRef(null)
   useEffect(() => {
     if (!aberta) return
     const tecla = (e) => { if (e.key === 'Escape') fechar() }
     window.addEventListener('keydown', tecla)
     return () => window.removeEventListener('keydown', tecla)
   }, [aberta, fechar])
+  // Ao abrir, o cursor vai para dentro da janela; ao fechar, volta para onde estava.
+  useEffect(() => {
+    if (!aberta) return
+    const antes = document.activeElement
+    const primeiro = caixa.current?.querySelector('input, select, textarea, button')
+    ;(primeiro || caixa.current)?.focus()
+    return () => { if (antes && document.contains(antes)) antes.focus() }
+  }, [aberta])
   if (!aberta) return null
   return (
     <div className="fundo" onClick={(e) => { if (e.target === e.currentTarget) fechar() }}>
-      <div className="folha" role="dialog" aria-modal="true" aria-label={rotulo}>{children}</div>
+      <div className="folha" role="dialog" aria-modal="true" aria-label={rotulo} ref={caixa} tabIndex={-1}>{children}</div>
     </div>
   )
 }

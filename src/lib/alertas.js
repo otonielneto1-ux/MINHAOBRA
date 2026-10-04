@@ -3,6 +3,10 @@
 
 import { diasEntre } from './datas.js'
 import { avancoServico, diasAtraso, servicosMedidos } from './avanco.js'
+import { PERFIS, STATUS_OCORRENCIA_ABERTOS } from './vocabulario.js'
+
+const ABERTA = STATUS_OCORRENCIA_ABERTOS[0]
+const idsDeClientes = (pessoas) => new Set(pessoas.filter((p) => p.role === PERFIS.CLIENTE).map((p) => p.id))
 
 export const LIMITES = {
   pacoteDiasAntesDoFechamento: 5,
@@ -12,8 +16,11 @@ export const LIMITES = {
 
 const PACOTE_ABERTO = ['Planejado', 'Liberado', 'Em execução']
 
-export function montarAlertas({ servicos, pacotes, restricoes, ocorrencias, efetivoLancado, hoje }) {
+// Lista geral de alertas. Ocorrências abertas pelo cliente ficam de fora: elas vão no
+// grupo em destaque (ocorrenciasDoCliente), para não aparecerem duas vezes.
+export function montarAlertas({ servicos, pacotes, restricoes, ocorrencias, pessoas, efetivoLancado, hoje }) {
   const alertas = []
+  const clientes = idsDeClientes(pessoas)
 
   for (const s of servicosMedidos(servicos)) {
     const atraso = diasAtraso(s, hoje)
@@ -53,7 +60,7 @@ export function montarAlertas({ servicos, pacotes, restricoes, ocorrencias, efet
   }
 
   for (const o of ocorrencias) {
-    if (o.status !== 'Aberta') continue
+    if (o.status !== ABERTA || clientes.has(o.aberta_por)) continue
     const dias = diasEntre(o.aberta_em, hoje)
     if (dias * 24 > LIMITES.ocorrenciaHorasSemResposta) {
       alertas.push({
@@ -72,6 +79,25 @@ export function montarAlertas({ servicos, pacotes, restricoes, ocorrencias, efet
   // Críticos primeiro.
   return alertas.sort((a, b) => (a.nivel === b.nivel ? 0 : a.nivel === 'crit' ? -1 : 1))
 }
+
+// Ocorrências abertas pelo cliente que ainda não fecharam — vão em destaque nos Alertas.
+// pessoas: [{ id, role }]. Mais urgentes primeiro: sem resposta além do limite, prazo vencido, depois a mais antiga.
+export function ocorrenciasDoCliente(ocorrencias, pessoas, hoje) {
+  const clientes = idsDeClientes(pessoas)
+  return ocorrencias
+    .filter((o) => clientes.has(o.aberta_por) && STATUS_OCORRENCIA_ABERTOS.includes(o.status))
+    .map((o) => {
+      const dias = diasEntre(o.aberta_em, hoje)
+      const semResposta = o.status === ABERTA && dias * 24 > LIMITES.ocorrenciaHorasSemResposta
+      const prazoVencido = !!o.prazo && o.prazo < hoje
+      return { id: o.id, numero: o.numero, titulo: o.titulo, status: o.status, prazo: o.prazo, dias, semResposta, prazoVencido, urgente: semResposta || prazoVencido }
+    })
+    .sort((a, b) => Number(b.urgente) - Number(a.urgente) || b.dias - a.dias)
+}
+
+// Alertas críticos do painel: os vermelhos da lista geral + ocorrências do cliente urgentes.
+export const contarCriticos = (alertas, doCliente) =>
+  alertas.filter((a) => a.nivel === 'crit').length + doCliente.filter((o) => o.urgente).length
 
 // Serviços atrasados para a tela do cliente: só nome, etapa e dias. Sem motivo.
 export function servicosAtrasados(servicos, hoje) {

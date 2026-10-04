@@ -1,5 +1,5 @@
 // PCP: resultado da baixa, PPC, janela do mestre, saldo, motivos.
-import { resultadoBaixa, ppc, mestrePodeAlterar, saldoPendente, contarMotivos, servicosNoPeriodo } from '../src/lib/pcp.js'
+import { resultadoBaixa, mestrePodeAlterar, saldoPendente, contarMotivos, servicosNoPeriodo } from '../src/lib/pcp.js'
 
 let ok = 0
 let tot = 0
@@ -19,10 +19,6 @@ conferir('campo vazio: recusa', resultadoBaixa(60, '', null).erro, 'Informe quan
 conferir('número negativo: recusa', resultadoBaixa(60, -5, null).erro, 'Informe quanto foi executado.')
 conferir('aceita texto numérico do campo', resultadoBaixa(3, '3.2', null).status, 'Concluída')
 
-const semana = [{ status: 'Concluída' }, { status: 'Concluída' }, { status: 'Não concluída' }, { status: 'Planejada' }]
-conferir('PPC no meio da semana: só o que teve baixa', ppc(semana), { concluidas: 2, base: 3, pct: 67 })
-conferir('PPC de semana encerrada: o que ficou sem baixa conta contra', ppc(semana, true), { concluidas: 2, base: 4, pct: 50 })
-conferir('PPC sem nenhuma baixa: vazio, não zero', ppc([{ status: 'Planejada' }]).pct, null)
 
 conferir('mestre altera no mesmo dia', mestrePodeAlterar('2026-10-07', '2026-10-07'), true)
 conferir('mestre altera no dia seguinte', mestrePodeAlterar('2026-10-06', '2026-10-07'), true)

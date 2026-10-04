@@ -5,13 +5,14 @@ import * as dados from '../lib/dados.js'
 import { dataBr } from '../lib/datas.js'
 import { numero, porcento } from '../lib/formato.js'
 import { Barra, Cabecalho, Carregando, CurvaS, ErroCaixa, Icone, Secao, Status, Vazio, useCarga } from '../components/index.jsx'
+import { Capa } from '../components/capa.jsx'
 
 export default function Avanco({ goto }) {
   const { obra } = useObra()
   const dia = dados.hoje()
   const { data, erro, carregando, recarregar } = useCarga(dados.avancoDaObra, [obra.id])
   const registrar = <button className="btn btn-fill" onClick={() => goto('novaOcorrencia')}><Icone nome="mais_um" />Registrar ocorrência</button>
-  const cab = <Cabecalho rotulo={`${obra.nome} · atualizado em ${dataBr(dia)}`} titulo="Avanço da obra" acoes={registrar} />
+  const cab = <><Cabecalho rotulo={`${obra.nome} · atualizado em ${dataBr(dia)}`} titulo="Avanço da obra" acoes={registrar} /><Capa /></>
 
   if (carregando && !data) return <>{cab}<Carregando /></>
   if (erro) return <>{cab}<ErroCaixa erro={erro} tentarDeNovo={recarregar} /></>

@@ -54,6 +54,19 @@ Criado automaticamente por um gatilho quando alguém se cadastra, já como "Agua
 
 ---
 
+## Tabela `config`
+
+Uma linha só: dados da construtora, que valem para todas as obras.
+
+| Campo | Tipo | Obrigatório | Observação |
+|---|---|---|---|
+| nome_construtora | text | sim | "Solutio Engenharia" |
+| logo_construtora | text | não | caminho no Storage (`config/logo_construtora.png`) |
+
+**Regra:** existe exatamente uma linha (CHECK em `id = 1`).
+
+---
+
 ## Tabela `obras`
 
 Cada obra. Hoje só a Conviver Costamare.
@@ -69,6 +82,8 @@ Cada obra. Hoje só a Conviver Costamare.
 | dia_fechamento_folha | int2 | sim | 1 a 31 |
 | status | text | sim | CHECK: Em andamento, Paralisada, Concluída |
 | ultimo_calculo_em | timestamptz | não | quando o caminho crítico foi recalculado |
+| foto_obra | text | não | caminho no Storage (`obras/<obra_id>/foto_obra.jpg`) |
+| logo_cliente | text | não | caminho no Storage (`obras/<obra_id>/logo_cliente.png`) |
 
 **Relações:** tem várias etapas de entrega, serviços, funcionários, pacotes, atividades de PCP, ocorrências.
 
@@ -353,9 +368,14 @@ Permissão de linha não esconde coluna. Por isso:
 - **Apagar:** ninguém (desativa).
 
 ### `obras`, `etapas_entrega`
-- **Ver:** todos os perfis liberados, da obra.
-- **Criar / editar:** Engenheiro e Coordenador.
+- **Ver:** todos os perfis liberados, da obra (inclui a foto da obra e a logo do cliente).
+- **Criar / editar:** Engenheiro e Coordenador (inclui trocar a foto e a logo).
 - **Apagar:** Engenheiro.
+
+### `config`
+- **Ver:** todos os perfis liberados.
+- **Editar:** Engenheiro e Coordenador.
+- **Criar / apagar:** ninguém (a linha nasce na migration).
 
 ### `obra_usuarios`
 - **Ver:** Engenheiro; cada um vê as próprias.
@@ -464,6 +484,7 @@ Permissão de linha não esconde coluna. Por isso:
 
 ## Arquivos
 
+- **Capa:** Storage, pastas `obras/<obra_id>/` (foto da obra, logo do cliente) e `config/` (logo da construtora). Todos os perfis liberados leem; só Engenheiro e Coordenador gravam. Foto reduzida a 1200 px (JPEG 0.8); logos a 600 px (PNG mantém transparência).
 - Storage, pasta `ocorrencias/<obra_id>/<ocorrencia_id>/`.
 - Imagem comprimida no navegador antes de subir (máx. 1200 px, qualidade 0.8); até 5 fotos por ocorrência.
 - O banco guarda o caminho em `ocorrencia_fotos.caminho`.

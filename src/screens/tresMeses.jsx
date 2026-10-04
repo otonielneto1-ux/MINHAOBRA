@@ -8,7 +8,7 @@ import { servicosNoPeriodo } from '../lib/pcp.js'
 import { avancoServico } from '../lib/avanco.js'
 import { dataBr, diaMes, segundaDaSemana, somarDias } from '../lib/datas.js'
 import { porcento } from '../lib/formato.js'
-import { Carregando, ErroCaixa, Folha, Secao, Status, useAviso, useCarga } from '../components/index.jsx'
+import { Carregando, ErroCaixa, Folha, Status, useAviso, useCarga } from '../components/index.jsx'
 
 async function carregar() {
   const r = await Promise.all([dados.listarServicos(), dados.listarRestricoes(), dados.listarEtapas()])
@@ -24,6 +24,14 @@ export default function TresMeses({ usuario }) {
   const [etapa, setEtapa] = useState(null)
   const [soComRestricao, setSoComRestricao] = useState(false)
   const [aberto, setAberto] = useState(null)
+  // As 4 primeiras semanas nascem abertas e as demais recolhidas; tocar no título inverte.
+  const [alternadas, setAlternadas] = useState(new Set())
+  const alternar = (seg) => {
+    const novo = new Set(alternadas)
+    if (novo.has(seg)) novo.delete(seg)
+    else novo.add(seg)
+    setAlternadas(novo)
+  }
   const { data, erro, carregando, recarregar } = useCarga(carregar, [obra.id])
 
   if (carregando && !data) return <Carregando />
@@ -32,6 +40,7 @@ export default function TresMeses({ usuario }) {
   const pendentes = (sid) => data.restricoes.filter((r) => r.servico_id === sid && r.status === 'Pendente')
   const primeira = segundaDaSemana(dia)
   const semanas = Array.from({ length: 13 }, (_, i) => somarDias(primeira, 7 * i))
+  const ate4 = semanas[4]
   const filtrar = (lista) => lista
     .filter((s) => etapa === null || s.etapa_entrega_id === etapa)
     .filter((s) => !soComRestricao || pendentes(s.id).length > 0)
@@ -52,9 +61,16 @@ export default function TresMeses({ usuario }) {
 
       {blocos.length === 0 && <div className="section"><p className="vazio-curto" style={{ textAlign: 'center' }}>Nada previsto para os próximos 3 meses.</p></div>}
 
-      {blocos.map(({ seg, lista }) => (
-        <Secao key={seg} rotulo={`Semana ${diaMes(seg)} a ${diaMes(somarDias(seg, 5))}${seg === primeira ? ' · esta semana' : ''}`}>
-          <div className="lista">
+      {blocos.map(({ seg, lista }) => {
+        const aberta = alternadas.has(seg) ? seg >= ate4 : seg < ate4
+        const titulo = `Semana ${diaMes(seg)} a ${diaMes(somarDias(seg, 5))}${seg === primeira ? ' · esta semana' : ''}`
+        return (
+        <section key={seg} className="section">
+          <button className="sec-head recolher" aria-expanded={aberta} onClick={() => alternar(seg)}>
+            <span className="lab lab-ink">{titulo}</span>
+            <span className="lab" style={{ marginLeft: 'auto' }}>{lista.length} {lista.length === 1 ? 'serviço' : 'serviços'} {aberta ? '▴' : '▾'}</span>
+          </button>
+          {aberta && <div className="lista">
             {lista.map((s) => {
               const n = pendentes(s.id).length
               const vencida = pendentes(s.id).some((r) => r.data_limite && r.data_limite < dia)
@@ -71,9 +87,10 @@ export default function TresMeses({ usuario }) {
                 </button>
               )
             })}
-          </div>
-        </Secao>
-      ))}
+          </div>}
+        </section>
+        )
+      })}
 
       <Folha aberta={!!aberto} fechar={() => setAberto(null)} rotulo="Restrições do serviço">
         {aberto && (

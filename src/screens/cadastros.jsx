@@ -7,6 +7,7 @@ import { pode } from '../lib/permissoes.js'
 import { dataBr } from '../lib/datas.js'
 import { TIPOS_MAO_OBRA } from '../lib/vocabulario.js'
 import { Abas, Cabecalho, Carregando, ErroCaixa, Icone, Secao, Status, useAviso, useCarga } from '../components/index.jsx'
+import { EnviarImagem } from '../components/capa.jsx'
 
 export default function Cadastros({ params, usuario }) {
   const abas = [
@@ -35,6 +36,8 @@ function ObraEtapas({ usuario }) {
   const embreve = () => aviso('Editar cadastros chega na próxima etapa')
   return (
     <div className="grid">
+      <ImagensDaCapa />
+
       <Secao className="span-6" rotulo="Obra" link={{ texto: 'Editar', acao: embreve }}>
         <div className="pares">
           <div><span>Nome</span><b>{obra.nome}</b></div>
@@ -54,6 +57,42 @@ function ObraEtapas({ usuario }) {
         </div>
       </Secao>
     </div>
+  )
+}
+
+// Foto da obra, logo do cliente e logo + nome da construtora (aparecem na capa de todos).
+function ImagensDaCapa() {
+  const { obra } = useObra()
+  const aviso = useAviso()
+  const { data: capa, recarregar } = useCarga(dados.buscarCapa, [obra.id])
+  const [nome, setNome] = useState(null)
+  if (!capa) return <div className="span-12"><Carregando /></div>
+  const nomeAtual = nome ?? capa.construtora
+
+  async function salvarNome() {
+    const { erro } = await dados.salvarNomeConstrutora(nomeAtual)
+    if (erro) { aviso(erro); return }
+    setNome(null)
+    recarregar()
+    aviso('Nome da construtora salvo')
+  }
+
+  return (
+    <Secao className="span-12" rotulo="Imagens da capa · aparecem para todos os perfis">
+      <div className="imagens">
+        <EnviarImagem tipo="foto_obra" valor={capa.foto_obra} nome={capa.obra} salvo={recarregar} />
+        <EnviarImagem tipo="logo_cliente" valor={capa.logo_cliente} nome={capa.cliente} salvo={recarregar} />
+        <EnviarImagem tipo="logo_construtora" valor={capa.logo_construtora} nome={capa.construtora} salvo={recarregar} />
+      </div>
+      <div className="campo" style={{ marginTop: 18, maxWidth: 520 }}>
+        <label className="lab" htmlFor="nome-construtora">Nome da construtora (vale para todas as obras)</label>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <input id="nome-construtora" className="ipt" value={nomeAtual} onChange={(e) => setNome(e.target.value)} />
+          <button className="btn" onClick={salvarNome} disabled={nome === null || nome === capa.construtora}>Salvar</button>
+        </div>
+      </div>
+      <p className="meta">O cliente da obra ({capa.cliente}) é editado nos dados da obra.</p>
+    </Secao>
   )
 }
 

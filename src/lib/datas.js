@@ -41,6 +41,21 @@ export function diasDaSemana(segunda) {
   return [0, 1, 2, 3, 4, 5].map((i) => somarDias(segunda, i))
 }
 
+// Primeiro dia do mês anterior ao da data: '2026-10-07' → '2026-09-01'.
+export function inicioDoMesAnterior(iso) {
+  let [a, m] = iso.split('-').map(Number)
+  m -= 1
+  if (m === 0) { m = 12; a -= 1 }
+  return `${a}-${String(m).padStart(2, '0')}-01`
+}
+
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
+
+// '2026-10' ou '2026-10-07' → 'outubro'
+export function nomeMes(isoOuMes) {
+  return MESES[Number(isoOuMes.slice(5, 7)) - 1]
+}
+
 export function nomeDia(iso) {
   return NOMES_DIA[paraData(iso).getDay()]
 }

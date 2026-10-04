@@ -86,12 +86,67 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .voltar { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-family: var(--mono); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--primary); margin-bottom: 4px; }
 .voltar svg { width: 18px; height: 18px; }
 
+/* ── Capa da obra: foto + logos ── */
+.capa { display: grid; grid-template-columns: 1fr 420px; background: var(--paper); border: 1px solid var(--line); margin-bottom: 20px; }
+.capa-reserva { min-height: 200px; }
+.capa-foto { position: relative; min-height: 200px; background-color: var(--bg); background-size: cover; background-position: center; border-right: 1px solid var(--line);
+  background-image: repeating-linear-gradient(0deg, transparent 0 23px, var(--line-soft) 23px 24px), repeating-linear-gradient(90deg, transparent 0 23px, var(--line-soft) 23px 24px); }
+.capa-sem-foto { position: absolute; top: 16px; right: 16px; display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.capa-titulo { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 20px; }
+.capa-nome { font-size: 28px; font-weight: 600; line-height: 1.15; letter-spacing: -.01em; }
+.capa-foto.com-foto .capa-titulo { background: linear-gradient(to top, rgba(19, 43, 64, .88), rgba(19, 43, 64, 0)); color: #fff; padding-top: 48px; }
+.capa-foto.com-foto .capa-titulo .lab, .capa-foto.com-foto .capa-titulo .meta { color: #E6EEF6; }
+.capa-editar { position: absolute; top: 12px; left: 12px; background: rgba(255, 255, 255, .94); }
+.capa-logos { display: grid; grid-template-columns: 1fr 1fr; }
+/* A logo ocupa a caixa inteira (menos a margem), crescendo até encostar na largura ou na altura,
+   sem esticar nem cortar: object-fit contain mantém a proporção. */
+.capa-logo { position: relative; display: flex; align-items: center; justify-content: center; padding: 16px; border-left: 1px solid var(--line); min-width: 0; min-height: 200px; background: #fff; }
+.capa-logo:first-child { border-left: 0; }
+.logo-img { position: absolute; inset: 16px; width: calc(100% - 32px); height: calc(100% - 32px); object-fit: contain; object-position: center; }
+.capa-logo .iniciais { width: 96px; height: 96px; font-size: 30px; }
+.iniciais { width: 80px; height: 80px; border: 1.5px solid var(--primary); color: var(--primary); display: grid; place-items: center; font-family: var(--mono); font-size: 26px; font-weight: 600; letter-spacing: .04em; }
+
+/* Enviar imagem (Cadastros) */
+.imagens { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+.enviar-img { display: flex; flex-direction: column; gap: 10px; padding: 14px 18px 4px; border-left: 1px solid var(--line); min-width: 0; }
+.enviar-img:first-child { border-left: 0; padding-left: 0; }
+.enviar-previa { height: 140px; border: 1px solid var(--line); background: var(--bg); display: grid; place-items: center; overflow: hidden; }
+.enviar-previa img { width: 100%; height: 100%; object-fit: cover; }
+.enviar-previa.logo img { object-fit: contain; padding: 10px; background: #fff; }
+.enviar-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+
 /* ── Seções ── */
 .section { background: var(--paper); border: 1px solid var(--line); padding: 20px 22px; }
 .section + .section { margin-top: 20px; }
 .sec-head { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; margin-bottom: 6px; border-bottom: 1px solid var(--line-strong); min-height: 44px; }
+.sec-head.recolher { width: 100%; text-align: left; margin-bottom: 0; }
+.sec-head.recolher[aria-expanded='true'] { margin-bottom: 6px; }
+.section > .sec-head.recolher[aria-expanded='false'] { border-bottom: 0; padding-bottom: 0; }
 .sec-head .link { margin-left: auto; font-family: var(--mono); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--primary); min-height: 44px; padding: 0 4px; }
-.grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; }
+.grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; align-items: stretch; }
+/* Dentro da grade, o espaço entre caixas é o gap: sem margem extra, as caixas lado a lado alinham no topo. */
+.grid > .section + .section { margin-top: 0; }
+
+/* PPC no Início */
+.ppc-bloco { border-top: 1px solid var(--line-strong); margin-top: 14px; padding-top: 14px; }
+.ppc-dois { display: grid; grid-template-columns: 1fr 1fr; }
+.ppc-dois > div + div { border-left: 1px solid var(--line); padding-left: 18px; }
+.ppc-valor { font-size: 44px; font-weight: 500; line-height: 1.05; letter-spacing: -.02em; margin: 2px 0; }
+.t-ok { color: var(--ok-ink); } .t-warn { color: var(--warn-ink); } .t-crit { color: var(--crit-ink); } .t-neutral { color: var(--muted); }
+.sobe { color: var(--ok-ink); font-weight: 600; } .desce { color: var(--crit-ink); font-weight: 600; }
+.ppc-semanas { margin-top: 8px; }
+.ppc-sem { display: grid; grid-template-columns: 96px 1fr 52px; gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line-soft); }
+.ppc-sem:first-child { border-top: 0; }
+.ppc-sem b { text-align: right; font-size: 18px; font-weight: 600; }
+.barra.warn i { background: var(--amber); }
+
+/* Ocorrências do cliente em destaque nos Alertas */
+.destaque { border: 1px solid var(--primary); border-left: 6px solid var(--primary); background: var(--primary-tint); padding: 4px 14px 2px; margin: 10px 0 8px; }
+.destaque-topo { display: flex; align-items: center; gap: 10px; min-height: 44px; border-bottom: 1px solid var(--primary); color: var(--primary); }
+.destaque-topo .link { white-space: nowrap; margin-left: auto; font-family: var(--mono); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--primary); min-height: 44px; padding: 0 4px; }
+.destaque .linha { border-top-color: var(--line); }
+.destaque button.linha:hover { background: rgba(255, 255, 255, .6); }
+.destaque-num { font-family: var(--mono); font-weight: 600; font-size: 14px; color: var(--primary); min-width: 44px; align-self: flex-start; margin-top: 3px; }
 .span-7 { grid-column: span 7; } .span-5 { grid-column: span 5; } .span-6 { grid-column: span 6; } .span-12 { grid-column: span 12; }
 
 /* ── Botões ── */
@@ -249,7 +304,8 @@ select.ipt { padding-right: 8px; }
 .tabela td { padding: 10px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
 .tabela tr.resumo td { background: var(--bg); font-weight: 600; }
 .tabela tr.clicavel { cursor: pointer; }
-.tabela tr.clicavel:hover td { background: var(--primary-tint); }
+.tabela tr.clicavel:hover td, .tabela tr.clicavel:focus-visible td { background: var(--primary-tint); }
+.tabela tr.clicavel:focus-visible { outline: 3px solid var(--amber); outline-offset: -3px; }
 .tabela .dir { text-align: right; white-space: nowrap; }
 .tabela .nome { min-width: 220px; }
 .tabela .falta { color: var(--warn-ink); font-weight: 600; }
@@ -300,7 +356,7 @@ select.ipt { padding-right: 8px; }
 .item-mais { display: flex; align-items: center; gap: 14px; min-height: 58px; width: 100%; padding: 0 4px; font-family: var(--mono); font-size: 15px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; border-top: 1px solid var(--line); }
 .item-mais:first-of-type { border-top: 0; }
 .item-mais svg { width: 22px; height: 22px; color: var(--primary); }
-.toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: var(--navy); color: #fff; font-family: var(--mono); font-size: 14px; font-weight: 600; letter-spacing: .03em; padding: 14px 18px; z-index: 60; max-width: calc(100% - 32px); text-align: center; }
+.toast { position: fixed; left: 50%; top: 92px; transform: translateX(-50%); width: max-content; background: var(--navy); color: #fff; font-family: var(--mono); font-size: 14px; font-weight: 600; letter-spacing: .03em; padding: 14px 18px; z-index: 60; max-width: calc(100% - 32px); text-align: center; }
 
 /* ── Entrada (login de exemplo) ── */
 .entrada { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
@@ -357,14 +413,29 @@ select.ipt { padding-right: 8px; }
   .seg { grid-template-columns: repeat(4, 1fr); }
   .seg button { padding: 0 2px; font-size: 12px; letter-spacing: .02em; }
   .salvar-barra { margin: 16px -16px -28px; padding: 12px 16px; bottom: calc(var(--bar) + env(safe-area-inset-bottom)); }
+  .capa { grid-template-columns: 1fr; }
+  .capa-foto { min-height: 160px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .capa-nome { font-size: 23px; }
+  .capa-logo { padding: 12px; min-height: 0; height: 120px; }
+  .logo-img { inset: 12px; width: calc(100% - 24px); height: calc(100% - 24px); }
+  .ppc-valor { font-size: 38px; }
+  .ppc-dois > div + div { padding-left: 14px; }
+  .ppc-sem { grid-template-columns: 84px 1fr 46px; }
+  .capa-logo .iniciais, .iniciais { width: 64px; height: 64px; font-size: 22px; }
+  .imagens { grid-template-columns: 1fr; }
+  .enviar-img { border-left: 0; padding: 14px 0 4px; border-top: 1px solid var(--line); }
+  .enviar-img:first-child { border-top: 0; }
   .so-largo { display: none; }
   .so-curto { display: inline; }
+  div.so-curto { display: block; }
+  .tabela .nome { min-width: 0; }
+  .tabela td, .tabela th { padding-left: 8px; padding-right: 8px; }
   .quadro { grid-template-columns: 1fr; }
   .coluna { border-left: 0; }
   .vazio { margin: 24px 0; padding: 36px 18px; }
   .fundo { align-items: flex-end; padding: 0; }
   .folha { max-width: none; border-width: 1px 0 0; padding: 22px 16px calc(22px + env(safe-area-inset-bottom)); max-height: 90vh; }
-  .toast { bottom: calc(var(--bar) + 18px); }
+  .toast { top: 84px; }
 }
 @media (max-width: 380px) {
   .kpi b { font-size: 38px; }

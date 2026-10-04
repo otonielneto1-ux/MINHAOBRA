@@ -7,7 +7,7 @@ import { pode } from '../lib/permissoes.js'
 import { mestrePodeAlterar } from '../lib/pcp.js'
 import { dataBr, nomeDia, somarDias } from '../lib/datas.js'
 import { PERFIS, SITUACOES, TIPOS_MAO_OBRA } from '../lib/vocabulario.js'
-import { Abas, Cabecalho, Carregando, ErroCaixa, Icone, Vazio, useAviso, useCarga } from '../components/index.jsx'
+import { Abas, Cabecalho, Carregando, ErroCaixa, Folha, Icone, Vazio, useAviso, useCarga } from '../components/index.jsx'
 
 const NOME_GRUPO = { Direta: 'Mão de obra direta', Indireta: 'Mão de obra indireta', Terceirizada: 'Terceirizada' }
 
@@ -46,6 +46,14 @@ function EfetivoDia({ data, setData, usuario, goto }) {
   const { data: base, erro, carregando, recarregar } = useCarga(() => carregar(data), [obra.id, data])
   const [rascunho, setRascunho] = useState(null)
   const [salvando, setSalvando] = useState(false)
+  const [outraData, setOutraData] = useState(null)
+
+  // Trocar de dia com marcações não salvas: pergunta antes de descartar.
+  function pedirData(nova) {
+    if (!nova || nova === data) return
+    if (rascunho) setOutraData(nova)
+    else setData(nova)
+  }
 
   if (carregando && !base) return <Carregando />
   if (erro) return <ErroCaixa erro={erro} tentarDeNovo={recarregar} />
@@ -92,7 +100,7 @@ function EfetivoDia({ data, setData, usuario, goto }) {
     <>
       <div className="filtros">
         <label className="lab" htmlFor="data-efetivo" style={{ position: 'absolute', left: -9999 }}>Data</label>
-        <input id="data-efetivo" className="ipt" type="date" style={{ width: 200 }} value={data} max={hoje} onChange={(e) => e.target.value && setData(e.target.value)} />
+        <input id="data-efetivo" className="ipt" type="date" style={{ width: 200 }} value={data} max={hoje} onChange={(e) => pedirData(e.target.value)} />
         {editavel && <button className="btn btn-quiet" onClick={repetirOntem}><Icone nome="copiar" />Repetir efetivo de ontem</button>}
         {!editavel && <span className="meta warn">Só leitura{usuario.role === PERFIS.MESTRE ? ' — o mestre edita hoje e ontem' : ''}</span>}
       </div>
@@ -143,6 +151,16 @@ function EfetivoDia({ data, setData, usuario, goto }) {
           <button className="btn btn-fill btn-lg" onClick={salvar} disabled={salvando || !rascunho}>{salvando ? 'Salvando…' : 'Salvar efetivo'}</button>
         </div>
       )}
+
+      <Folha aberta={!!outraData} fechar={() => setOutraData(null)} rotulo="Marcações não salvas">
+        <div className="lab">Efetivo de {dataBr(data)}</div>
+        <h2>Descartar as marcações não salvas?</h2>
+        <p className="sub">Você marcou pessoas e ainda não salvou. Se trocar para {outraData && dataBr(outraData)}, essas marcações se perdem.</p>
+        <div className="folha-acoes">
+          <button className="btn btn-fill btn-lg" onClick={() => setOutraData(null)}>Continuar editando</button>
+          <button className="btn btn-perigo btn-lg" onClick={() => { const d = outraData; setOutraData(null); setData(d) }}>Descartar e trocar</button>
+        </div>
+      </Folha>
     </>
   )
 }

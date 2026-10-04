@@ -76,6 +76,17 @@ Não se aplica.
 
 ---
 
+## Componente: Capa da obra
+
+**Quem vê:** todos os perfis, no topo da tela inicial (Início, Hoje, Avanço; para o Técnico de Segurança, em Planejamento › Semana).
+
+**O que aparece**
+- À esquerda (no celular, em cima): a foto da obra, larga, com "Obra", o nome e a cidade por cima, sobre uma faixa escura. Sem foto: quadriculado de prancheta e "Sem foto da obra".
+- À direita (no celular, embaixo): duas caixas lado a lado com **só as imagens** — logo do cliente e logo da construtora. Cada logo ocupa a caixa inteira (menos a margem), crescendo até encostar na largura ou na altura, sem distorcer nem cortar. Sem texto; o nome vai no texto alternativo da imagem. Sem logo: as iniciais (CU, SE).
+- Engenheiro e Coordenador veem o botão **Trocar imagens**, que abre Cadastros › Obra e etapas.
+
+---
+
 ## Tela: Início (Painel do dia)
 
 **Quem acessa:** Engenheiro, Coordenador.
@@ -84,9 +95,9 @@ Não se aplica.
 **O que aparece** (de cima para baixo; no computador em grade de 2 colunas)
 1. Cabeçalho: nome da obra, data de hoje, "Cronograma calculado em 04/10/2026 07:30".
 2. **Avanço físico:** número grande do realizado (ex.: 41,8%) com o previsto para hoje ao lado (ex.: 45,2%) e a diferença em pontos (−3,4 p.p., vermelho se negativo). Abaixo, uma linha por etapa de entrega (Geral, Fase 01, Fase 02) com barra realizado x previsto. Mini curva S (previsto x realizado até hoje). Se houver serviço sem custo, aviso amarelo: "4 serviços sem custo — avanço ponderado por duração" (leva ao Cronograma em Editar custos).
-3. **Atividades de hoje:** lista do PCP com data de hoje: serviço, local, quantidade planejada, equipe, etiqueta de status. Rodapé: "PPC da semana até agora: 67%".
+3. **Atividades de hoje:** lista do PCP com data de hoje: serviço, local, quantidade planejada, equipe, etiqueta de status. Embaixo, o **bloco de PPC**: PPC da semana e PPC do mês lado a lado (com "x de y concluídas"), o mês anterior com a variação em pontos (▲ verde / ▼ vermelho), a situação contra a meta de 80% ("Mês 17 pontos abaixo da meta de 80%") e uma barra por semana que toca o mês (a semana inteira, igual à tela Semana) com a marca da meta. O PPC do mês soma todas as atividades com data no mês. Regra do PPC, a mesma no app inteiro: dia que já passou sem baixa conta como não concluído; hoje só conta depois da baixa; dias futuros não contam. Cor: verde na meta, âmbar até 20 pontos abaixo, vermelho abaixo disso.
 4. **Efetivo de hoje:** total de presentes; três números por tipo (Direta, Indireta, Terceirizada); lista curta por função. Se não lançado: "Efetivo de hoje ainda não lançado" em amarelo.
-5. **Alertas:** lista com ícone e cor:
+5. **Alertas:** no topo, em destaque azul, o grupo **"Ocorrências do cliente · N abertas"** (abertas pelo perfil Cliente e ainda não resolvidas/recusadas): nº, título, status e prazo; sem resposta há mais de 48 h ou prazo vencido em vermelho e no topo do grupo; "Ver todas" leva à lista. Essas ocorrências não se repetem na lista geral. Avanço físico e Alertas ficam lado a lado com o mesmo topo e a mesma altura. Depois, a lista geral com ícone e cor:
    - vermelho: "Rede de esgoto – Fase 01 · crítico · 6 dias de atraso"
    - amarelo: "Pacote Galeria Rua 2 – trecho 1: 65% da meta, fecha em 4 dias"
    - amarelo: "Restrição vencida: liberação da Rua 5 (prazo 02/10)"
@@ -428,6 +439,8 @@ Histórico: "Nenhuma produção lançada neste serviço."
 Três abas:
 
 **Obra e etapas**
+- Imagens da capa: três espaços (Foto da obra, Logo do cliente, Logo da construtora), cada um com prévia, **Enviar imagem** / **Trocar imagem** e **Remover**. Aceita JPG, PNG ou WEBP até 15 MB; câmera ou galeria no celular. Foto reduzida a 1200 px; logos a 600 px, PNG mantém o fundo transparente.
+- Nome da construtora (vale para todas as obras), com **Salvar**.
 - Campos da obra: nome, cidade, UF, cliente, data de início, data de término contratual, dia de fechamento da folha, status (Em andamento, Paralisada, Concluída).
 - Etapas de entrega: nome, ordem, data de entrega contratual. Ações: nova, editar, excluir (só sem serviço ligado).
 - Botão **Nova obra** (Engenheiro).

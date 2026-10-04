@@ -1,7 +1,8 @@
 // Planejamento — três abas: Semana (PCP), 3 meses e Cronograma.
 
-import { pode } from '../lib/permissoes.js'
+import { pode, telaInicial } from '../lib/permissoes.js'
 import { Abas, Cabecalho } from '../components/index.jsx'
+import { Capa } from '../components/capa.jsx'
 import Semana from './semana.jsx'
 import TresMeses from './tresMeses.jsx'
 import Cronograma from './cronograma.jsx'
@@ -19,6 +20,8 @@ export default function Planejamento({ goto, params, usuario }) {
   return (
     <>
       <Cabecalho rotulo="Planejamento" titulo={TITULOS[aba]} />
+      {/* Para o Técnico de Segurança, o Planejamento é a tela inicial: a capa aparece aqui. */}
+      {telaInicial(usuario.role) === 'planejamento' && aba === 'semana' && <Capa />}
       <Abas abas={abas} atual={aba} trocar={(id) => goto('planejamento', { aba: id })} />
       {aba === 'semana' && <Semana goto={goto} usuario={usuario} />}
       {aba === 'tresMeses' && <TresMeses goto={goto} usuario={usuario} />}

@@ -4,9 +4,10 @@ import { useState } from 'react'
 import { useObra } from '../lib/ObraContext.jsx'
 import * as dados from '../lib/dados.js'
 import { dataBr, nomeDiaLongo, somarDias } from '../lib/datas.js'
-import { quantidade } from '../lib/formato.js'
+import { quantidade, saudacao } from '../lib/formato.js'
 import { Caixa, Cabecalho, Carregando, ErroCaixa, Secao, Status, useAviso, useCarga } from '../components/index.jsx'
 import { JanelaBaixa } from './semana.jsx'
+import { Capa } from '../components/capa.jsx'
 
 async function carregar(dia) {
   const r = await Promise.all([
@@ -39,7 +40,8 @@ export default function Hoje({ goto, usuario }) {
 
   return (
     <>
-      <Cabecalho rotulo={`${nomeDiaLongo(dia)}, ${dataBr(dia)} · ${obra.nome}`} titulo={`Bom dia, ${usuario.nome.split(' ')[0]}`} />
+      <Cabecalho rotulo={`${nomeDiaLongo(dia)}, ${dataBr(dia)} · ${obra.nome}`} titulo={`${saudacao(dados.horaAgora())}, ${usuario.nome.split(' ')[0]}`} />
+      <Capa />
 
       {ontemSemBaixa.length > 0 && (
         <button className="aviso" style={{ marginTop: 0, marginBottom: 16 }} onClick={() => goto('planejamento', { aba: 'semana' })}>

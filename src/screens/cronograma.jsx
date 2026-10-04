@@ -67,7 +67,8 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
       {gestao && (
         <div className="filtros">
           <button className="btn" onClick={() => goto('importar')}><Icone nome="arquivo" />Importar do Project</button>
-          <button className={`btn ${editando ? 'btn-fill' : ''}`} onClick={() => setEditando(!editando)}>{editando ? 'Parar de editar' : 'Editar custos'}</button>
+          <button className={`btn so-largo ${editando ? 'btn-fill' : ''}`} onClick={() => setEditando(!editando)}>{editando ? 'Parar de editar' : 'Editar custos'}</button>
+          <span className="meta so-curto">Custos: edite no computador</span>
           <button className="btn btn-quiet" onClick={() => aviso('O recálculo do caminho crítico chega junto com a importação')}>Recalcular</button>
           <span className="lab" style={{ marginLeft: 'auto' }}>Calculado em {diaMes(obra.ultimo_calculo_em.slice(0, 10))} {obra.ultimo_calculo_em.slice(11, 16)}</span>
         </div>
@@ -98,7 +99,9 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
               const atraso = diasAtraso(s, dia)
               const semCusto = !(Number(s.custo_orcado) > 0)
               return (
-                <tr key={s.id} className="clicavel" onClick={() => !editando && goto('servico', { id: s.id })}>
+                <tr key={s.id} className="clicavel" tabIndex={editando ? undefined : 0} aria-label={`Abrir ${s.nome}`}
+                  onClick={() => !editando && goto('servico', { id: s.id })}
+                  onKeyDown={(e) => { if (!editando && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); goto('servico', { id: s.id }) } }}>
                   <td className="num">{s.codigo_eap}</td>
                   <td className="nome">
                     <div style={{ fontWeight: 600 }}>{s.nome}</div>
