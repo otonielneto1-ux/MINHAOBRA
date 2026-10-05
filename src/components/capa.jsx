@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import { useObra } from '../lib/ObraContext.jsx'
 import * as dados from '../lib/dados.js'
-import { IMAGENS_CAPA, iniciais, validarArquivoImagem } from '../lib/imagem.js'
+import { IMAGENS_CAPA, TAMANHO_MAXIMO_MB, TIPOS_IMAGEM, iniciais, validarArquivoImagem } from '../lib/imagem.js'
 import { comprimirImagem } from './imagem.js'
 import { Icone, useAviso, useCarga } from './index.jsx'
 
@@ -17,7 +17,9 @@ function Logo({ src, papel, nome }) {
 // Aparece no topo da tela inicial de todos os perfis.
 export function Capa({ editar }) {
   const { obra } = useObra()
-  const { data: c } = useCarga(dados.buscarCapa, [obra.id])
+  const { data: c, erro } = useCarga(dados.buscarCapa, [obra.id])
+  // A capa é só ilustração: se falhar, some e deixa o resto da tela funcionar.
+  if (erro) return null
   if (!c) return <div className="capa capa-reserva" aria-hidden="true" />
   return (
     <section className="capa" aria-label="Obra, cliente e construtora">
@@ -47,32 +49,33 @@ export function EnviarImagem({ tipo, valor, nome, salvo }) {
   const [erro, setErro] = useState(null)
   const cfg = IMAGENS_CAPA[tipo]
 
+  // Grava a imagem (ou null para remover). "Salvando…" trava os botões até terminar.
+  async function gravar(imagem, mensagem) {
+    setSalvando(true)
+    const { erro: falhou } = await dados.salvarImagem(tipo, imagem)
+    setSalvando(false)
+    if (falhou) { setErro(falhou); return }
+    aviso(mensagem)
+    salvo()
+  }
+
   async function escolher(e) {
     const arquivo = e.target.files?.[0]
     e.target.value = ''
     if (!arquivo) return
     const problema = validarArquivoImagem(arquivo)
-    if (problema) { setErro(problema); return }
-    setErro(null)
+    setErro(problema)
+    if (problema) return
     setSalvando(true)
+    let imagem
     try {
-      const imagem = await comprimirImagem(arquivo, cfg)
-      const { erro: e2 } = await dados.salvarImagem(tipo, imagem)
-      if (e2) { setErro(e2); return }
-      aviso(`${cfg.rotulo} salva`)
-      salvo()
-    } catch (falha) {
-      setErro(falha.message)
-    } finally {
+      imagem = await comprimirImagem(arquivo, cfg)
+    } catch {
       setSalvando(false)
+      setErro('Não foi possível ler esta imagem. Tente outra.')
+      return
     }
-  }
-
-  async function remover() {
-    const { erro: e2 } = await dados.salvarImagem(tipo, null)
-    if (e2) { setErro(e2); return }
-    aviso(`${cfg.rotulo} removida`)
-    salvo()
+    gravar(imagem, `${cfg.rotulo} salva`)
   }
 
   return (
@@ -83,15 +86,15 @@ export function EnviarImagem({ tipo, valor, nome, salvo }) {
           ? <img src={valor} alt={`${cfg.rotulo} atual`} />
           : cfg.formato === 'logo' ? <span className="iniciais">{iniciais(nome)}</span> : <span className="lab">Sem foto</span>}
       </div>
-      <input ref={entrada} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={escolher} />
+      <input ref={entrada} type="file" accept={TIPOS_IMAGEM.join(',')} hidden onChange={escolher} />
       <div className="enviar-acoes">
         <button className="btn btn-fill" onClick={() => entrada.current.click()} disabled={salvando}>
           {salvando ? 'Salvando…' : valor ? 'Trocar imagem' : 'Enviar imagem'}
         </button>
-        {valor && !salvando && <button className="btn btn-perigo" onClick={remover}>Remover</button>}
+        {valor && <button className="btn btn-perigo" disabled={salvando} onClick={() => { setErro(null); gravar(null, `${cfg.rotulo} removida`) }}>Remover</button>}
       </div>
       {erro && <p className="erro-campo" role="alert">{erro}</p>}
-      <p className="meta">{cfg.formato === 'logo' ? 'PNG com fundo transparente fica melhor' : 'Foto deitada fica melhor'} · até 15 MB</p>
+      <p className="meta">{cfg.formato === 'logo' ? 'PNG com fundo transparente fica melhor' : 'Foto deitada fica melhor'} · até {TAMANHO_MAXIMO_MB} MB</p>
     </div>
   )
 }

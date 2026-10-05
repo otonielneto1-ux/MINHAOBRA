@@ -61,7 +61,7 @@ Uma linha só: dados da construtora, que valem para todas as obras.
 | Campo | Tipo | Obrigatório | Observação |
 |---|---|---|---|
 | nome_construtora | text | sim | "Solutio Engenharia" |
-| logo_construtora | text | não | caminho no Storage (`config/logo_construtora.png`) |
+| logo_construtora | text | não | caminho no Storage (`config/logo_construtora.png` ou `.jpg` (PNG continua PNG; JPG e WEBP viram JPEG)) |
 
 **Regra:** existe exatamente uma linha (CHECK em `id = 1`).
 
@@ -83,7 +83,7 @@ Cada obra. Hoje só a Conviver Costamare.
 | status | text | sim | CHECK: Em andamento, Paralisada, Concluída |
 | ultimo_calculo_em | timestamptz | não | quando o caminho crítico foi recalculado |
 | foto_obra | text | não | caminho no Storage (`obras/<obra_id>/foto_obra.jpg`) |
-| logo_cliente | text | não | caminho no Storage (`obras/<obra_id>/logo_cliente.png`) |
+| logo_cliente | text | não | caminho no Storage (`obras/<obra_id>/logo_cliente.png` ou `.jpg` (PNG continua PNG; JPG e WEBP viram JPEG)) |
 
 **Relações:** tem várias etapas de entrega, serviços, funcionários, pacotes, atividades de PCP, ocorrências.
 
@@ -484,7 +484,7 @@ Permissão de linha não esconde coluna. Por isso:
 
 ## Arquivos
 
-- **Capa:** Storage, pastas `obras/<obra_id>/` (foto da obra, logo do cliente) e `config/` (logo da construtora). Todos os perfis liberados leem; só Engenheiro e Coordenador gravam. Foto reduzida a 1200 px (JPEG 0.8); logos a 600 px (PNG mantém transparência).
+- **Capa:** Storage, pastas `obras/<obra_id>/` (foto da obra, logo do cliente) e `config/` (logo da construtora). Todos os perfis liberados leem; só Engenheiro e Coordenador gravam. Foto reduzida a 1200 px (JPEG 0.8); logos a 600 px (logo em PNG continua PNG e mantém a transparência; JPG e WEBP viram JPEG).
 - Storage, pasta `ocorrencias/<obra_id>/<ocorrencia_id>/`.
 - Imagem comprimida no navegador antes de subir (máx. 1200 px, qualidade 0.8); até 5 fotos por ocorrência.
 - O banco guarda o caminho em `ocorrencia_fotos.caminho`.

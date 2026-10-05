@@ -12,6 +12,7 @@ import { daObra } from './obra.js'
 import { resumoAvanco, curvaS } from './avanco.js'
 import { servicosAtrasados } from './alertas.js'
 import { pode } from './permissoes.js'
+import { OCORRENCIA_ABERTA } from './vocabulario.js'
 import { resultadoBaixa } from './pcp.js'
 import * as mock from './mockData.js'
 
@@ -60,16 +61,17 @@ export function listarMinhasObras() {
 const CHAVE = { foto_obra: (id) => `minhaobra:obra:${id}:foto_obra`, logo_cliente: (id) => `minhaobra:obra:${id}:logo_cliente`, logo_construtora: () => 'minhaobra:config:logo_construtora' }
 const CHAVE_NOME_CONSTRUTORA = 'minhaobra:config:nome_construtora'
 
+// globalThis (e não window): o teste em Node troca o localStorage por um falso.
 function lerGuardado(chave) {
-  try { return window.localStorage.getItem(chave) } catch { return null }
+  try { return globalThis.localStorage?.getItem(chave) ?? null } catch { return null }
 }
 function guardar(chave, valor) {
   try {
-    if (valor === null) window.localStorage.removeItem(chave)
-    else window.localStorage.setItem(chave, valor)
+    if (valor === null) globalThis.localStorage.removeItem(chave)
+    else globalThis.localStorage.setItem(chave, valor)
     return null
   } catch {
-    return 'Não coube no navegador. Tente uma imagem menor.'
+    return 'Não coube no navegador.'
   }
 }
 
@@ -94,9 +96,9 @@ export function buscarCapa() {
 // tipo: foto_obra | logo_cliente | logo_construtora. valor: imagem já comprimida, ou null para remover.
 export function salvarImagem(tipo, valor) {
   if (!pode(role(), 'gerirCadastros')) return falha('Seu perfil não troca as imagens.')
-  if (!(tipo in CHAVE)) return falha('Imagem desconhecida.')
+  if (!Object.hasOwn(CHAVE, tipo)) return falha('Imagem desconhecida.')
   const erro = guardar(CHAVE[tipo](obraAtualId), valor)
-  if (erro) return falha(erro)
+  if (erro) return falha(`${erro} Tente uma imagem menor.`)
   if (tipo === 'logo_construtora') mock.config.logo_construtora = valor
   else mock.obras.find((x) => x.id === obraAtualId)[tipo] = valor
   return ok(true)
@@ -105,7 +107,8 @@ export function salvarImagem(tipo, valor) {
 export function salvarNomeConstrutora(nome) {
   if (!pode(role(), 'gerirCadastros')) return falha('Seu perfil não altera a construtora.')
   if (!nome?.trim()) return falha('Informe o nome da construtora.')
-  guardar(CHAVE_NOME_CONSTRUTORA, nome.trim())
+  const erro = guardar(CHAVE_NOME_CONSTRUTORA, nome.trim())
+  if (erro) return falha(erro)
   mock.config.nome_construtora = nome.trim()
   return ok(true)
 }
@@ -277,7 +280,7 @@ export function criarOcorrencia({ titulo, local, etapa_entrega_id, descricao }) 
   const nova = {
     id: Math.max(0, ...mock.ocorrencias.map((o) => o.id)) + 1, obra_id: obraAtualId,
     numero: Math.max(0, ...daObraAtual.map((o) => o.numero)) + 1, titulo: titulo.trim(), local: local.trim(),
-    etapa_entrega_id: etapa_entrega_id || null, descricao: descricao.trim(), status: 'Aberta', aberta_por: usuarioAtual.id,
+    etapa_entrega_id: etapa_entrega_id || null, descricao: descricao.trim(), status: OCORRENCIA_ABERTA, aberta_por: usuarioAtual.id,
     responsavel_id: null, prazo: null, resposta: null, aberta_em: hoje(), respondida_em: null, fechada_em: null,
   }
   mock.ocorrencias.push(nova)

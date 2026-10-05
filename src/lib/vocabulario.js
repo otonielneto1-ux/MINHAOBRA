@@ -37,8 +37,10 @@ export const TIPOS_MAO_OBRA = ['Direta', 'Indireta', 'Terceirizada']
 
 export const SITUACOES = ['Presente', 'Falta', 'Atestado', 'Afastado']
 
-export const STATUS_OCORRENCIA = ['Aberta', 'Em análise', 'Em tratamento', 'Resolvida', 'Recusada']
+export const OCORRENCIA_ABERTA = 'Aberta'
 
-export const STATUS_OCORRENCIA_ABERTOS = ['Aberta', 'Em análise', 'Em tratamento']
+export const STATUS_OCORRENCIA = [OCORRENCIA_ABERTA, 'Em análise', 'Em tratamento', 'Resolvida', 'Recusada']
+
+export const STATUS_OCORRENCIA_ABERTOS = [OCORRENCIA_ABERTA, 'Em análise', 'Em tratamento']
 
 export const STATUS_OBRA = ['Em andamento', 'Paralisada', 'Concluída']

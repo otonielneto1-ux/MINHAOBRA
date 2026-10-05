@@ -80,6 +80,9 @@ e a Vercel publica sozinha. Ele não digita comando: o agente roda npm e git na 
   **Exceção:** as imagens da capa e o nome da construtora ficam no `localStorage` do navegador
   (chaves `minhaobra:obra:<id>:...` e `minhaobra:config:...`), para sobreviver ao recarregar.
   No banco, isso vira Storage + colunas `obras.foto_obra`, `obras.logo_cliente` e a tabela `config`.
+- `src/lib/dados.js` usa `globalThis.localStorage` (não `window`). `tests/dados.mjs` troca o
+  localStorage por um falso **antes** de importar `dados.js` — é o único teste que importa a
+  camada de dados; serve para as portas de entrada (permissão, tipo de imagem, erro de gravação).
 - Compressão de imagem usa canvas, então mora em `src/components/imagem.js`; as regras puras
   (tipo, tamanho, medidas, iniciais) ficam em `src/lib/imagem.js`, com teste.
 

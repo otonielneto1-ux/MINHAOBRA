@@ -64,8 +64,9 @@ function ObraEtapas({ usuario }) {
 function ImagensDaCapa() {
   const { obra } = useObra()
   const aviso = useAviso()
-  const { data: capa, recarregar } = useCarga(dados.buscarCapa, [obra.id])
+  const { data: capa, erro, recarregar } = useCarga(dados.buscarCapa, [obra.id])
   const [nome, setNome] = useState(null)
+  if (erro) return <div className="span-12"><ErroCaixa erro={erro} tentarDeNovo={recarregar} /></div>
   if (!capa) return <div className="span-12"><Carregando /></div>
   const nomeAtual = nome ?? capa.construtora
 

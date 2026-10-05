@@ -3,9 +3,8 @@
 
 import { diasEntre } from './datas.js'
 import { avancoServico, diasAtraso, servicosMedidos } from './avanco.js'
-import { PERFIS, STATUS_OCORRENCIA_ABERTOS } from './vocabulario.js'
+import { OCORRENCIA_ABERTA, PERFIS, STATUS_OCORRENCIA_ABERTOS } from './vocabulario.js'
 
-const ABERTA = STATUS_OCORRENCIA_ABERTOS[0]
 const idsDeClientes = (pessoas) => new Set(pessoas.filter((p) => p.role === PERFIS.CLIENTE).map((p) => p.id))
 
 export const LIMITES = {
@@ -60,7 +59,7 @@ export function montarAlertas({ servicos, pacotes, restricoes, ocorrencias, pess
   }
 
   for (const o of ocorrencias) {
-    if (o.status !== ABERTA || clientes.has(o.aberta_por)) continue
+    if (o.status !== OCORRENCIA_ABERTA || clientes.has(o.aberta_por)) continue
     const dias = diasEntre(o.aberta_em, hoje)
     if (dias * 24 > LIMITES.ocorrenciaHorasSemResposta) {
       alertas.push({
@@ -88,7 +87,7 @@ export function ocorrenciasDoCliente(ocorrencias, pessoas, hoje) {
     .filter((o) => clientes.has(o.aberta_por) && STATUS_OCORRENCIA_ABERTOS.includes(o.status))
     .map((o) => {
       const dias = diasEntre(o.aberta_em, hoje)
-      const semResposta = o.status === ABERTA && dias * 24 > LIMITES.ocorrenciaHorasSemResposta
+      const semResposta = o.status === OCORRENCIA_ABERTA && dias * 24 > LIMITES.ocorrenciaHorasSemResposta
       const prazoVencido = !!o.prazo && o.prazo < hoje
       return { id: o.id, numero: o.numero, titulo: o.titulo, status: o.status, prazo: o.prazo, dias, semResposta, prazoVencido, urgente: semResposta || prazoVencido }
     })

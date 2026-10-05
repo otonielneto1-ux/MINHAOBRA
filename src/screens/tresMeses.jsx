@@ -24,7 +24,7 @@ export default function TresMeses({ usuario }) {
   const [etapa, setEtapa] = useState(null)
   const [soComRestricao, setSoComRestricao] = useState(false)
   const [aberto, setAberto] = useState(null)
-  // As 4 primeiras semanas nascem abertas e as demais recolhidas; tocar no título inverte.
+  // As 4 primeiras semanas DA LISTA nascem abertas e as demais recolhidas; tocar no título inverte.
   const [alternadas, setAlternadas] = useState(new Set())
   const alternar = (seg) => {
     const novo = new Set(alternadas)
@@ -40,7 +40,6 @@ export default function TresMeses({ usuario }) {
   const pendentes = (sid) => data.restricoes.filter((r) => r.servico_id === sid && r.status === 'Pendente')
   const primeira = segundaDaSemana(dia)
   const semanas = Array.from({ length: 13 }, (_, i) => somarDias(primeira, 7 * i))
-  const ate4 = semanas[4]
   const filtrar = (lista) => lista
     .filter((s) => etapa === null || s.etapa_entrega_id === etapa)
     .filter((s) => !soComRestricao || pendentes(s.id).length > 0)
@@ -61,8 +60,8 @@ export default function TresMeses({ usuario }) {
 
       {blocos.length === 0 && <div className="section"><p className="vazio-curto" style={{ textAlign: 'center' }}>Nada previsto para os próximos 3 meses.</p></div>}
 
-      {blocos.map(({ seg, lista }) => {
-        const aberta = alternadas.has(seg) ? seg >= ate4 : seg < ate4
+      {blocos.map(({ seg, lista }, i) => {
+        const aberta = (i < 4) !== alternadas.has(seg)
         const titulo = `Semana ${diaMes(seg)} a ${diaMes(somarDias(seg, 5))}${seg === primeira ? ' · esta semana' : ''}`
         return (
         <section key={seg} className="section">

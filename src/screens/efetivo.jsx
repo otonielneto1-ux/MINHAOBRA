@@ -1,6 +1,6 @@
 // Efetivo do dia: situação de cada funcionário e o pacote em que trabalhou.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useObra } from '../lib/ObraContext.jsx'
 import * as dados from '../lib/dados.js'
 import { pode } from '../lib/permissoes.js'
@@ -28,32 +28,41 @@ async function carregar(data) {
 export default function Efetivo({ goto, usuario }) {
   const [aba, setAba] = useState('dia')
   const [data, setData] = useState(dados.hoje())
+  // Marcações não salvas: trocar de dia ou ir para o Histórico pergunta antes de descartar.
+  const [sujo, setSujo] = useState(false)
+  const [depois, setDepois] = useState(null)
+  const seguro = (acao) => (sujo ? setDepois(() => acao) : acao())
+
   return (
     <>
       <Cabecalho rotulo="Efetivo · quem trabalhou em pacote conta para o prêmio" titulo="Efetivo do dia" />
-      <Abas abas={[{ id: 'dia', texto: 'Lançar' }, { id: 'historico', texto: 'Histórico' }]} atual={aba} trocar={setAba} />
+      <Abas abas={[{ id: 'dia', texto: 'Lançar' }, { id: 'historico', texto: 'Histórico' }]} atual={aba}
+        trocar={(id) => id !== aba && seguro(() => setAba(id))} />
       {aba === 'dia'
-        ? <EfetivoDia key={data} data={data} setData={setData} usuario={usuario} goto={goto} />
+        ? <EfetivoDia key={data} data={data} pedirData={(d) => d && d !== data && seguro(() => setData(d))} onSujo={setSujo} usuario={usuario} goto={goto} />
         : <Historico abrir={(d) => { setData(d); setAba('dia') }} />}
+
+      <Folha aberta={!!depois} fechar={() => setDepois(null)} rotulo="Marcações não salvas">
+        <div className="lab">Efetivo de {dataBr(data)}</div>
+        <h2>Descartar as marcações não salvas?</h2>
+        <p className="sub">Você marcou pessoas e ainda não salvou. Se continuar, essas marcações se perdem.</p>
+        <div className="folha-acoes">
+          <button className="btn btn-fill btn-lg" onClick={() => setDepois(null)}>Continuar editando</button>
+          <button className="btn btn-perigo btn-lg" onClick={() => { const acao = depois; setDepois(null); setSujo(false); acao() }}>Descartar</button>
+        </div>
+      </Folha>
     </>
   )
 }
 
-function EfetivoDia({ data, setData, usuario, goto }) {
+function EfetivoDia({ data, pedirData, onSujo, usuario, goto }) {
   const { obra } = useObra()
   const aviso = useAviso()
   const hoje = dados.hoje()
   const { data: base, erro, carregando, recarregar } = useCarga(() => carregar(data), [obra.id, data])
   const [rascunho, setRascunho] = useState(null)
   const [salvando, setSalvando] = useState(false)
-  const [outraData, setOutraData] = useState(null)
-
-  // Trocar de dia com marcações não salvas: pergunta antes de descartar.
-  function pedirData(nova) {
-    if (!nova || nova === data) return
-    if (rascunho) setOutraData(nova)
-    else setData(nova)
-  }
+  useEffect(() => { onSujo(!!rascunho) }, [rascunho])
 
   if (carregando && !base) return <Carregando />
   if (erro) return <ErroCaixa erro={erro} tentarDeNovo={recarregar} />
@@ -151,16 +160,6 @@ function EfetivoDia({ data, setData, usuario, goto }) {
           <button className="btn btn-fill btn-lg" onClick={salvar} disabled={salvando || !rascunho}>{salvando ? 'Salvando…' : 'Salvar efetivo'}</button>
         </div>
       )}
-
-      <Folha aberta={!!outraData} fechar={() => setOutraData(null)} rotulo="Marcações não salvas">
-        <div className="lab">Efetivo de {dataBr(data)}</div>
-        <h2>Descartar as marcações não salvas?</h2>
-        <p className="sub">Você marcou pessoas e ainda não salvou. Se trocar para {outraData && dataBr(outraData)}, essas marcações se perdem.</p>
-        <div className="folha-acoes">
-          <button className="btn btn-fill btn-lg" onClick={() => setOutraData(null)}>Continuar editando</button>
-          <button className="btn btn-perigo btn-lg" onClick={() => { const d = outraData; setOutraData(null); setData(d) }}>Descartar e trocar</button>
-        </div>
-      </Folha>
     </>
   )
 }

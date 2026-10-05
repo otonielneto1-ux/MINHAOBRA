@@ -138,7 +138,9 @@ export function Folha({ aberta, fechar, children, rotulo }) {
   useEffect(() => {
     if (!aberta) return
     const antes = document.activeElement
-    const primeiro = caixa.current?.querySelector('input, select, textarea, button')
+    // Primeiro campo ou botão visível e habilitado (pula input escondido e botão desabilitado).
+    const primeiro = [...(caixa.current?.querySelectorAll('input, select, textarea, button') || [])]
+      .find((el) => !el.disabled && el.offsetParent !== null)
     ;(primeiro || caixa.current)?.focus()
     return () => { if (antes && document.contains(antes)) antes.focus() }
   }, [aberta])

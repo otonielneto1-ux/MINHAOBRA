@@ -144,7 +144,7 @@ Não se aplica.
 **Chega aqui por:** menu Planejamento, aba Semana.
 
 **O que aparece**
-1. Seletor de semana: "◀ 05/10 a 10/10/2026 ▶" e o PPC da semana (ex.: "PPC 67% · 4 de 6").
+1. Seletor de semana: "◀ 05/10 a 10/10/2026 ▶" e o PPC da semana (ex.: "PPC 75% · 3 de 4").
 2. Computador: 6 colunas (segunda a sábado) com cartões. Celular: abas de dia (Seg, Ter, Qua, Qui, Sex, Sáb), um dia por vez, abrindo no dia de hoje.
 3. Cada cartão: serviço, local, quantidade planejada, equipe, pacote (se houver), etiqueta de status (Planejada cinza, Concluída verde, Não concluída vermelha), quantidade executada e motivo quando houver baixa.
 4. Abaixo (computador) ou em botão "Ver motivos" (celular): gráfico de barras dos motivos de não conclusão nas últimas 8 semanas, e o PPC de cada uma dessas semanas.

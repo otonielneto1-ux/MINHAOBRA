@@ -6,9 +6,9 @@ export const TAMANHO_MAXIMO_MB = 15
 
 // As três imagens da capa: onde moram e como são comprimidas.
 export const IMAGENS_CAPA = {
-  foto_obra: { rotulo: 'Foto da obra', dono: 'obra', maxLado: 1200, formato: 'foto' },
-  logo_cliente: { rotulo: 'Logo do cliente', dono: 'obra', maxLado: 600, formato: 'logo' },
-  logo_construtora: { rotulo: 'Logo da construtora', dono: 'config', maxLado: 600, formato: 'logo' },
+  foto_obra: { rotulo: 'Foto da obra', maxLado: 1200, formato: 'foto' },
+  logo_cliente: { rotulo: 'Logo do cliente', maxLado: 600, formato: 'logo' },
+  logo_construtora: { rotulo: 'Logo da construtora', maxLado: 600, formato: 'logo' },
 }
 
 // Confere o arquivo escolhido antes de comprimir. Devolve null (ok) ou a mensagem de erro.

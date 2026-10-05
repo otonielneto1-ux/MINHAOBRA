@@ -99,7 +99,7 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
               const atraso = diasAtraso(s, dia)
               const semCusto = !(Number(s.custo_orcado) > 0)
               return (
-                <tr key={s.id} className="clicavel" tabIndex={editando ? undefined : 0} aria-label={`Abrir ${s.nome}`}
+                <tr key={s.id} className="clicavel" tabIndex={editando ? undefined : 0}
                   onClick={() => !editando && goto('servico', { id: s.id })}
                   onKeyDown={(e) => { if (!editando && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); goto('servico', { id: s.id }) } }}>
                   <td className="num">{s.codigo_eap}</td>
