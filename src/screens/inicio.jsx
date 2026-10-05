@@ -3,7 +3,7 @@
 import { useObra } from '../lib/ObraContext.jsx'
 import * as dados from '../lib/dados.js'
 import { resumoAvanco, curvaS } from '../lib/avanco.js'
-import { META_PPC, ppcAte, ppcDoMes, tomPpc } from '../lib/pcp.js'
+import { META_PPC, ppcAte, ppcDoMes, tomPpc, equipeDaAtividade } from '../lib/pcp.js'
 import { contarCriticos, montarAlertas, ocorrenciasDoCliente } from '../lib/alertas.js'
 import { efetivoTerceirizadas } from '../lib/efetivo.js'
 import { inicioDoMesAnterior, mesesEntre, nomeMes, segundaDaSemana, somarDias, dataBr, diaMes, nomeDiaLongo } from '../lib/datas.js'
@@ -204,7 +204,7 @@ export default function Inicio({ goto, usuario }) {
                   <Caixa tom={a.status === 'Concluída' ? 'ok' : a.status === 'Não concluída' ? 'crit' : ''} />
                   <div className="linha-main">
                     <div className="linha-titulo">{s?.nome}</div>
-                    <div className="meta">{a.local} · {a.equipe || 'sem equipe'}</div>
+                    <div className="meta">{a.local} · {equipeDaAtividade(a) || 'sem equipe'}</div>
                   </div>
                   <div className="linha-qtd num">{quantidade(a.quantidade_planejada, s?.unidade)}</div>
                 </button>

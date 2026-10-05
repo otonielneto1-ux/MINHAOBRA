@@ -6,10 +6,10 @@ import { useState } from 'react'
 import * as dados from '../lib/dados.js'
 import { CONFERENCIA_INICIO, conferenciaOk, distribuirNaSemana, precisaConferencia, validarAtividade } from '../lib/pcp.js'
 import { diasDaSemana, diaMes, nomeDia, somarDias } from '../lib/datas.js'
-import { quantidade } from '../lib/formato.js'
-import { Folha, Status } from '../components/index.jsx'
+import { arredondar, quantidade } from '../lib/formato.js'
+import { servicosMedidos } from '../lib/avanco.js'
+import { Folha, Status, useAoAbrir } from '../components/index.jsx'
 
-const ehMedido = (s) => !s.e_resumo && !s.cancelado
 const BLOQUEIO = 'Responda a conferência: as quatro precisam ser "sim" para planejar o início do serviço.'
 
 export function Conferencia({ respostas = [], mudar }) {
@@ -35,34 +35,35 @@ export function Conferencia({ respostas = [], mudar }) {
 const responder = (respostas, i, v) => { const r = [...respostas]; r[i] = v; return r }
 
 // aberta: { atividade } para editar, { inicial } para nova (inicial pode trazer servico_id, data_prevista e local).
-export function FolhaAtividade({ aberta, segunda, servicos, pacotes, atividades, fechar, salvo }) {
+export function FolhaAtividade({ aberta, segunda, hoje, servicos, pacotes, atividades, fechar, salvo }) {
   const [campos, setCampos] = useState({})
   const [busca, setBusca] = useState('')
   const [respostas, setRespostas] = useState([])
   const [erro, setErro] = useState(null)
   const [salvando, setSalvando] = useState(false)
-  const [abertaPara, setAbertaPara] = useState(null)
 
   // Ao abrir, o formulário recomeça com os dados da atividade (ou com o que veio sugerido).
-  if (aberta && abertaPara !== aberta) {
+  // Atividade nova só de hoje em diante; editar mantém o dia que ela já tem.
+  const editando = !!aberta?.atividade
+  const dias = diasDaSemana(segunda).filter((d) => editando || d >= hoje)
+  useAoAbrir(aberta, () => {
     const a = aberta.atividade || aberta.inicial || {}
     const s = servicos.find((x) => x.id === a.servico_id)
-    setAbertaPara(aberta)
     setCampos({
-      servico_id: a.servico_id ?? '', data_prevista: a.data_prevista || segunda, local: a.local ?? s?.local ?? '',
+      servico_id: a.servico_id ?? '', data_prevista: dias.includes(a.data_prevista) ? a.data_prevista : dias[0] || '', local: a.local ?? s?.local ?? '',
       quantidade_planejada: a.quantidade_planejada ?? '', equipe: a.equipe ?? '', pacote_id: a.pacote_id ?? '',
     })
     setBusca('')
     setRespostas([])
     setErro(null)
-  }
-  if (!aberta && abertaPara !== null) setAbertaPara(null)
+  })
 
-  const editando = !!aberta?.atividade
   const servico = servicos.find((s) => s.id === Number(campos.servico_id))
-  const conferir = !editando && servico && precisaConferencia(servico, atividades)
+  // Conferência de início: atividade nova, ou edição que troca para um serviço que ainda não começou.
+  const outras = atividades.filter((a) => a.id !== aberta?.atividade?.id)
+  const conferir = servico && (!editando || servico.id !== aberta.atividade.servico_id) && precisaConferencia(servico, outras)
   const termo = busca.trim().toLowerCase()
-  const opcoes = servicos.filter(ehMedido)
+  const opcoes = servicosMedidos(servicos)
     .filter((s) => !termo || s.id === servico?.id || `${s.codigo_eap} ${s.nome}`.toLowerCase().includes(termo))
   const pacotesDoServico = pacotes.filter((p) => p.servico_id === servico?.id && !p.fechado_em)
   const mudar = (k, v) => { setCampos((c) => ({ ...c, [k]: v })); setErro(null) }
@@ -78,7 +79,7 @@ export function FolhaAtividade({ aberta, segunda, servicos, pacotes, atividades,
   async function salvar() {
     if (conferir && !conferenciaOk(respostas)) { setErro(BLOQUEIO); return }
     const pacote = pacotes.find((p) => p.id === Number(campos.pacote_id))
-    const v = validarAtividade(campos, { servico, pacote, segunda })
+    const v = validarAtividade(campos, { servico, pacote, segunda, hoje, nova: !editando })
     if (v.erro) { setErro(v.erro); return }
     setSalvando(true)
     const r = editando ? await dados.editarAtividade(aberta.atividade.id, v.registro) : await dados.criarAtividades([v.registro])
@@ -113,7 +114,8 @@ export function FolhaAtividade({ aberta, segunda, servicos, pacotes, atividades,
           <div className="campo">
             <label className="lab" htmlFor="dia-atividade">Dia</label>
             <select id="dia-atividade" className="ipt" value={campos.data_prevista} onChange={(e) => mudar('data_prevista', e.target.value)}>
-              {diasDaSemana(segunda).map((d) => <option key={d} value={d}>{nomeDia(d)} · {diaMes(d)}</option>)}
+              {dias.length === 0 && <option value="">Semana encerrada</option>}
+              {dias.map((d) => <option key={d} value={d}>{nomeDia(d)} · {diaMes(d)}</option>)}
             </select>
           </div>
           <div className="campo">
@@ -159,7 +161,6 @@ export function FolhaDistribuir({ aberta, segunda, hoje, linhas, antecipaveis, a
   const [respostas, setRespostas] = useState({})
   const [erro, setErro] = useState(null)
   const [salvando, setSalvando] = useState(false)
-  const [abertaPara, setAbertaPara] = useState(null)
 
   const itens = !aberta ? [] : [
     ...linhas.map((l) => ({
@@ -170,13 +171,11 @@ export function FolhaDistribuir({ aberta, segunda, hoje, linhas, antecipaveis, a
   ].filter((x) => x.d).map((x) => ({ ...x, conferir: precisaConferencia(x.s, atividades) }))
 
   // Ao abrir, vêm marcados os previstos e atrasados que não pedem conferência (e o serviço escolhido para antecipar).
-  if (aberta && abertaPara !== aberta) {
-    setAbertaPara(aberta)
+  useAoAbrir(aberta, () => {
     setMarcados(new Set(itens.filter((x) => (!x.antecipar && !x.conferir) || x.s.id === aberta.foco).map((x) => x.s.id)))
     setRespostas({})
     setErro(null)
-  }
-  if (!aberta && abertaPara !== null) setAbertaPara(null)
+  })
 
   const liberado = (x) => !x.conferir || conferenciaOk(respostas[x.s.id])
   const escolhidos = itens.filter((x) => marcados.has(x.s.id))
@@ -219,7 +218,7 @@ export function FolhaDistribuir({ aberta, segunda, hoje, linhas, antecipaveis, a
                   </div>
                   {d.irreal && (
                     <p className="meta warn" style={{ marginTop: 6 }}>
-                      ⚠ Ritmo irreal: precisa {quantidade(d.porDia, s.unidade)}/dia; o {d.base === 'histórico' ? 'melhor ritmo das últimas 4 semanas' : 'ritmo planejado'} é {quantidade(Math.round(d.referencia * 10) / 10, s.unidade)}/dia.
+                      ⚠ Ritmo irreal: precisa {quantidade(d.porDia, s.unidade)}/dia; o {d.base === 'histórico' ? 'melhor ritmo das últimas 4 semanas' : 'ritmo planejado'} é {quantidade(arredondar(d.referencia, 1), s.unidade)}/dia.
                     </p>
                   )}
                 </div>

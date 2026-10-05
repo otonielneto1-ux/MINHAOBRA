@@ -149,7 +149,7 @@ export const pcp_atividades = linhasPcp.map(([data, servico_id, pacote_id, local
   const dow = new Date(`${data}T12:00:00`).getDay()
   return {
     id: i + 1, obra_id: OBRA, semana_inicio: somarDias(data, -(dow === 0 ? 6 : dow - 1)), data_prevista: data,
-    servico_id, pacote_id, local, quantidade_planejada: planejada, equipe, status,
+    servico_id, pacote_id, local, quantidade_planejada: planejada, equipe, status, equipe_executou: status === P ? null : equipe,
     quantidade_executada: status === P ? null : executada, motivo_nao_conclusao: motivo || null,
     baixa_por: status === P ? null : 3, baixa_em: status === P ? null : `${data}T17:30:00`, copiada_de_id: null,
   }

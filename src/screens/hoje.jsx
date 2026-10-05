@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useObra } from '../lib/ObraContext.jsx'
 import * as dados from '../lib/dados.js'
+import { equipeDaAtividade } from '../lib/pcp.js'
 import { dataBr, nomeDiaLongo, somarDias } from '../lib/datas.js'
 import { quantidade, saudacao } from '../lib/formato.js'
 import { Caixa, Cabecalho, Carregando, ErroCaixa, Secao, Status, useAviso, useCarga } from '../components/index.jsx'
@@ -74,7 +75,7 @@ export default function Hoje({ goto, usuario }) {
                 <Caixa tom={a.status === 'Concluída' ? 'ok' : a.status === 'Não concluída' ? 'crit' : ''} />
                 <div className="linha-main">
                   <div className="linha-titulo">{s?.nome}</div>
-                  <div className="meta">{a.local} · {a.equipe || 'sem equipe'}{a.pacote_id ? ` · pacote ${pacote(a.pacote_id)?.nome}` : ''}</div>
+                  <div className="meta">{a.local} · {equipeDaAtividade(a) || 'sem equipe'}{a.pacote_id ? ` · pacote ${pacote(a.pacote_id)?.nome}` : ''}</div>
                   {feita && <div style={{ marginTop: 6 }}><Status tom={a.status === 'Concluída' ? 'ok' : 'crit'}>{a.status} · {quantidade(a.quantidade_executada, s?.unidade)}</Status></div>}
                 </div>
                 <div className="linha-qtd num">{quantidade(a.quantidade_planejada, s?.unidade)}</div>

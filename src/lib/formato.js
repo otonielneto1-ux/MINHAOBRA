@@ -36,6 +36,12 @@ export function pontos(v) {
   return `${s}${numero(Math.abs(v), 1)} p.p.`
 }
 
+// Arredonda para `casas` casas decimais (para mostrar e para gravar quantidade e dinheiro).
+export function arredondar(v, casas) {
+  const f = 10 ** casas
+  return Math.round(Number(v) * f) / f
+}
+
 // O contrário: número digitado por gente → Number. "85.000,50", "85000,5", "85000.5", "−12".
 // Ponto seguido de exatamente 3 dígitos é separador de milhar (jeito brasileiro).
 // Vazio → null; texto que não é número → NaN.

@@ -8,37 +8,37 @@ import * as dados from '../lib/dados.js'
 import { pode } from '../lib/permissoes.js'
 import {
   acumuladosDaSemana, ppcAte, copiarPendentes, grupoDoMotivo, motivosPorGrupo, linhasDaSemana, mestrePodeAlterar, podeAntecipar,
-  resultadoBaixa, ritmoDaSemana, SEMANAS_ANTECIPAR,
+  equipeDaAtividade, META_PPC, ppcPorSemana, previaBaixa, ritmoDaSemana, SEMANAS_ANTECIPAR, tomPpc,
 } from '../lib/pcp.js'
 import { avancoServico } from '../lib/avanco.js'
 import { dataBr, diasDaSemana, diaMes, inicioDoMesAnterior, nomeDia, nomeMes, segundaDaSemana, somarDias } from '../lib/datas.js'
-import { porcento, quantidade } from '../lib/formato.js'
+import { arredondar, porcento, quantidade } from '../lib/formato.js'
 import { GRUPOS_MOTIVO, PERFIS, STATUS_PCP } from '../lib/vocabulario.js'
-import { Caixa, Carregando, ErroCaixa, Folha, Icone, Pizza, Secao, Status, useAviso, useCarga } from '../components/index.jsx'
+import { Barra, Caixa, Carregando, ErroCaixa, Folha, Icone, Pizza, Secao, Status, useAoAbrir, useAviso, useCarga } from '../components/index.jsx'
 import { FolhaAtividade, FolhaDistribuir } from './atividade.jsx'
 
-const arredondar = (v) => Math.round(v * 10) / 10
-
-// Cor de cada grupo macro no gráfico de pizza.
-const COR_GRUPO = {
-  'Condição climática': '#1F4E79', 'Execução': '#D64545', 'Planejamento': '#F5A623', 'Projetos': '#132B40',
-  'Suprimentos': '#2E8B57', 'Segurança': '#7B4FA0', 'Outros': '#9AA5B1',
-}
+// Cor de cada grupo macro no gráfico de pizza, na ordem de GRUPOS_MOTIVO (renomear um grupo não tira a cor).
+const CORES_GRUPO = ['#1F4E79', '#D64545', '#F5A623', '#132B40', '#2E8B57', '#7B4FA0', '#9AA5B1']
+const corDoGrupo = (g) => CORES_GRUPO[Object.keys(GRUPOS_MOTIVO).indexOf(g)] || CORES_GRUPO[CORES_GRUPO.length - 1]
 
 // Pizza de um mês: grupos macro, com as causas de cada um no detalhe.
 function PizzaDoMes({ atividades, mes }) {
   const fatias = motivosPorGrupo(atividades, mes).map((g) => ({
-    rotulo: g.grupo, valor: g.total, cor: COR_GRUPO[g.grupo], detalhe: g.causas.map((c) => `${c.motivo} · ${c.total}`),
+    rotulo: g.grupo, valor: g.total, cor: corDoGrupo(g.grupo), detalhe: g.causas.map((c) => `${c.motivo} · ${c.total}`),
   }))
   return <Pizza titulo={`${nomeMes(mes)} de ${mes.slice(0, 4)}`} fatias={fatias} vazio="Todas as metas diárias foram atingidas." />
 }
+
 const tomDe = (status) => (status === STATUS_PCP.CONCLUIDA ? 'ok' : status === STATUS_PCP.NAO_CONCLUIDA ? 'crit' : '')
 
 async function carregarSemana(segunda) {
   const r = await Promise.all([
-    // Até o sábado da semana seguinte: é lá que ficam as cópias das pendentes.
-    // Desde o mês anterior (pizza dos motivos) até o sábado da semana seguinte (cópias das pendentes).
-    dados.listarAtividades({ de: [somarDias(segunda, -49), inicioDoMesAnterior(dados.hoje())].sort()[0], ate: somarDias(segunda, 12) }),
+    // Das 8 semanas antes da tela (PPC) e do mês anterior a hoje (pizza) até o sábado da semana seguinte
+    // (cópias das pendentes) ou hoje (pizza do mês atual), o que vier depois.
+    dados.listarAtividades({
+      de: [somarDias(segunda, -49), inicioDoMesAnterior(dados.hoje())].sort()[0],
+      ate: [somarDias(segunda, 12), dados.hoje()].sort()[1],
+    }),
     dados.listarServicos(), dados.listarPacotes(), dados.listarProducoes(), dados.listarDependencias(), dados.listarRestricoes(),
   ])
   const erro = r.find((x) => x.erro)?.erro
@@ -80,7 +80,7 @@ export default function Semana({ usuario, params = {} }) {
   const salvo = (msg) => { setFolha(null); setDistribuir(null); setCopiar(null); setBaixa(null); aviso(msg); recarregar() }
 
   function abrirCopia() {
-    const copias = copiarPendentes(data.atividades, data.pacotes, segunda)
+    const copias = copiarPendentes(data.atividades, data.pacotes, segunda, dia)
     if (copias.length === 0) { aviso('Nenhuma atividade não concluída para copiar nesta semana'); return }
     setCopiar(copias)
   }
@@ -175,7 +175,9 @@ export default function Semana({ usuario, params = {} }) {
                                 onClick={() => setBaixa(a)}>
                                 <b className="num">{quantidade(feita ? a.quantidade_executada : a.quantidade_planejada, s.unidade)}</b>
                                 <span>{feita ? `de ${quantidade(a.quantidade_planejada, s.unidade)}` : 'planejado'}</span>
-                                {a.equipe && <span>{a.equipe}</span>}
+                                {a.local !== s.local && <span>{a.local}</span>}
+                                {equipeDaAtividade(a) && <span>{equipeDaAtividade(a)}</span>}
+                                {a.pacote_id && <span>pacote {pacote(a.pacote_id)?.nome}</span>}
                                 {a.motivo_nao_conclusao && <span className="t-crit">{a.motivo_nao_conclusao}</span>}
                               </button>
                             )
@@ -187,10 +189,10 @@ export default function Semana({ usuario, params = {} }) {
                         </td>
                       )
                     })}
-                    <td className="dir num acum">{quantidade(arredondar(r.planejado), s.unidade)}</td>
+                    <td className="dir num acum">{quantidade(arredondar(r.planejado, 1), s.unidade)}</td>
                     <td className={`dir num ${r.irreal ? 't-warn' : ''}`}>
-                      {r.saldo > 0 ? <b>{r.irreal ? '⚠ ' : ''}{quantidade(arredondar(r.necessario), s.unidade)}</b> : '—'}
-                      {r.irreal && <div className="meta warn">irreal · {r.base === 'histórico' ? 'melhor' : 'cronograma'} {quantidade(arredondar(r.referencia), s.unidade)}</div>}
+                      {r.saldo > 0 ? <b>{r.irreal ? '⚠ ' : ''}{quantidade(arredondar(r.necessario, 1), s.unidade)}</b> : '—'}
+                      {r.irreal && <div className="meta warn">irreal · {r.base === 'histórico' ? 'melhor' : 'cronograma'} {quantidade(arredondar(r.referencia, 1), s.unidade)}</div>}
                       {r.prazoVencido && r.saldo > 0 && <div className="meta crit">prazo vencido</div>}
                     </td>
                     <Acumulados servico={s} producoes={veProducao ? data.producoes : null} segunda={segunda} />
@@ -228,7 +230,7 @@ export default function Semana({ usuario, params = {} }) {
                           <Caixa tom={tomDe(a.status)} />
                           <div>
                             <div className="tarefa-titulo">{s?.nome}</div>
-                            <div className="tarefa-meta">{a.local} · {a.equipe || 'sem equipe'}{pac ? ` · pacote ${pac.nome}` : ''}</div>
+                            <div className="tarefa-meta">{a.local} · {equipeDaAtividade(a) || 'sem equipe'}{pac ? ` · pacote ${pac.nome}` : ''}</div>
                           </div>
                         </div>
                         <div className="tarefa-qtd">
@@ -274,6 +276,16 @@ export default function Semana({ usuario, params = {} }) {
           {verMotivos ? 'Esconder motivos' : 'Ver motivos de não conclusão'}
         </button>
       </div>
+      <Secao rotulo={`PPC das últimas 8 semanas · meta ${META_PPC}%`}>
+        {ppcPorSemana(data.atividades, segunda, dia).map((x) => (
+          <div key={x.semana_inicio} className="ppc-semana">
+            <span className="num">{diaMes(x.semana_inicio)}</span>
+            <Barra pct={x.pct ?? 0} marco={META_PPC} tom={tomPpc(x.pct)} />
+            <b className={`num t-${tomPpc(x.pct)}`}>{x.pct === null ? '—' : `${x.pct}%`}</b>
+          </div>
+        ))}
+      </Secao>
+
       <Secao className={`chart ${verMotivos ? '' : 'so-largo'}`} rotulo="Por que a meta do dia não foi atingida · por grupo">
         <div className="pizzas">
           <PizzaDoMes atividades={data.atividades} mes={dia.slice(0, 7)} />
@@ -281,7 +293,7 @@ export default function Semana({ usuario, params = {} }) {
         </div>
       </Secao>
 
-      <FolhaAtividade aberta={folha} segunda={segunda} servicos={data.servicos} pacotes={data.pacotes} atividades={data.atividades}
+      <FolhaAtividade aberta={folha} segunda={segunda} hoje={dia} servicos={data.servicos} pacotes={data.pacotes} atividades={data.atividades}
         fechar={() => setFolha(null)} salvo={salvo} />
       <FolhaDistribuir aberta={distribuir} segunda={segunda} hoje={dia} linhas={linhas} antecipaveis={antecipaveis}
         atividades={data.atividades} producoes={data.producoes} fechar={() => setDistribuir(null)} salvo={salvo} />
@@ -322,7 +334,7 @@ function Acumulados({ servico: s, producoes, segunda }) {
       <td className="dir num acum">{quantidade(s.quantidade_prevista, s.unidade)}</td>
       <td className="dir num">{a ? quantidade(a.anterior, s.unidade) : '—'}</td>
       <td className="dir num">
-        {a ? <><b>{quantidade(a.executado, s.unidade)}</b><div className="meta">{porcento(Math.min(100, (a.executado / a.total) * 100), 0)}</div></> : '—'}
+        {a ? <><b>{quantidade(a.executado, s.unidade)}</b><div className="meta">{porcento(a.pct, 0)}</div></> : '—'}
       </td>
     </>
   )
@@ -337,22 +349,19 @@ export function JanelaBaixa({ atividade, servico, fechar, salvo, editar = null }
   const [grupo, setGrupo] = useState(null)
   const [erro, setErro] = useState(null)
   const [salvando, setSalvando] = useState(false)
-  const [abertaPara, setAbertaPara] = useState(null)
 
   // Ao abrir para outra atividade, o formulário recomeça com os dados dela.
-  if (atividade && abertaPara !== atividade.id) {
-    setAbertaPara(atividade.id)
+  useAoAbrir(atividade?.id, () => {
     setExecutada(String(atividade.quantidade_executada ?? atividade.quantidade_planejada))
-    setEquipe(atividade.equipe || '')
+    setEquipe(equipeDaAtividade(atividade) || '')
     setMotivo(atividade.motivo_nao_conclusao)
     setGrupo(atividade.motivo_nao_conclusao ? grupoDoMotivo(atividade.motivo_nao_conclusao) : null)
     setErro(null)
-  }
-  if (!atividade && abertaPara !== null) setAbertaPara(null)
+  })
 
   // Só para mostrar se fica concluída ou não; a validação de verdade roda ao salvar.
-  const previa = atividade ? resultadoBaixa(atividade.quantidade_planejada, executada, motivo || 'x', 'x') : null
-  const naoConclui = previa?.status === STATUS_PCP.NAO_CONCLUIDA
+  const previa = atividade ? previaBaixa(atividade.quantidade_planejada, executada) : null
+  const naoConclui = previa === STATUS_PCP.NAO_CONCLUIDA
 
   async function salvar() {
     setSalvando(true)
@@ -382,7 +391,7 @@ export function JanelaBaixa({ atividade, servico, fechar, salvo, editar = null }
                 onChange={(e) => { setExecutada(e.target.value); setErro(null) }} />
               <span>{servico?.unidade}</span>
             </div>
-            {previa?.status && <Status tom={naoConclui ? 'crit' : 'ok'}>{naoConclui ? 'Não atingiu o programado — escolha o motivo' : 'Fica concluída'}</Status>}
+            {previa && <Status tom={naoConclui ? 'crit' : 'ok'}>{naoConclui ? 'Não atingiu o programado — escolha o motivo' : 'Fica concluída'}</Status>}
           </div>
           <div className="campo">
             <label className="lab" htmlFor="equipe-baixa">Qual equipe fez?</label>

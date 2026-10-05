@@ -1,5 +1,5 @@
 // PCP: resultado da baixa, PPC, janela do mestre, saldo, motivos.
-import { grupoDoMotivo, motivosPorGrupo, resultadoBaixa, mestrePodeAlterar, saldoPendente, contarMotivos, servicosNoPeriodo, validarAtividade, copiarPendentes, validarRestricao, validarRemocao } from '../src/lib/pcp.js'
+import { grupoDoMotivo, motivosPorGrupo, resultadoBaixa, mestrePodeAlterar, saldoPendente, contarMotivos, validarAtividade, previaBaixa, equipeDaAtividade, ppcPorSemana, restricaoVencida, copiarPendentes, validarRestricao, validarRemocao } from '../src/lib/pcp.js'
 
 let ok = 0
 let tot = 0
@@ -33,13 +33,20 @@ conferir('motivos contados e ordenados', contarMotivos([
   { status: 'Não concluída', motivo_nao_conclusao: 'Chuva' }, { status: 'Concluída', motivo_nao_conclusao: null },
 ]), [{ motivo: 'Chuva', total: 2 }, { motivo: 'Projeto', total: 1 }])
 
-const servicos = [
-  { id: 1, inicio_previsto: '2026-10-01', fim_previsto: '2026-10-20' },
-  { id: 2, inicio_previsto: '2026-11-01', fim_previsto: '2026-11-30' },
-  { id: 3, inicio_previsto: '2026-09-01', fim_previsto: '2026-12-01', fim_real: '2026-10-02' },
-  { id: 4, inicio_previsto: '2026-10-01', fim_previsto: '2026-10-20', e_resumo: true },
+conferir('prévia: atingiu o programado', previaBaixa(60, '60'), 'Concluída')
+conferir('prévia: abaixo do programado', previaBaixa(60, '59,5'), 'Não concluída')
+conferir('prévia: campo vazio não decide', previaBaixa(60, ''), null)
+conferir('equipe: depois da baixa, a que executou', equipeDaAtividade({ equipe: 'Eq. A', equipe_executou: 'Eq. B' }), 'Eq. B')
+conferir('equipe: antes da baixa, a planejada', equipeDaAtividade({ equipe: 'Eq. A', equipe_executou: null }), 'Eq. A')
+conferir('restrição pendente com prazo passado: vencida', restricaoVencida({ status: 'Pendente', data_limite: '2026-10-02' }, '2026-10-05'), true)
+conferir('restrição removida não vence', restricaoVencida({ status: 'Removida', data_limite: '2026-10-02' }, '2026-10-05'), false)
+conferir('restrição sem prazo não vence', restricaoVencida({ status: 'Pendente', data_limite: null }, '2026-10-05'), false)
+const historico = [
+  { semana_inicio: '2026-09-21', data_prevista: '2026-09-22', status: 'Concluída' }, { semana_inicio: '2026-09-21', data_prevista: '2026-09-23', status: 'Não concluída' },
+  { semana_inicio: '2026-09-28', data_prevista: '2026-09-29', status: 'Concluída' },
 ]
-conferir('plano de 3 meses: só o que cruza a semana e não terminou', servicosNoPeriodo(servicos, '2026-10-12', '2026-10-17').map((s) => s.id), [1])
+conferir('PPC das últimas semanas, a mais antiga primeiro', ppcPorSemana(historico, '2026-10-05', '2026-10-07', 3).map((x) => [x.semana_inicio, x.pct]),
+  [['2026-09-21', 50], ['2026-09-28', 100], ['2026-10-05', null]])
 
 // ── Montar a semana ──
 const galeria = { id: 22, nome: 'Galeria', e_resumo: false, cancelado: false, unidade: 'm', quantidade_prevista: 3200, quantidade_executada: 1534, inicio_previsto: '2026-08-03', fim_previsto: '2026-11-30', local: 'Ruas 1 a 4' }
@@ -53,6 +60,8 @@ conferir('domingo fica fora da semana', validarAtividade({ ...campos, data_previ
 conferir('sem local recusa', validarAtividade({ ...campos, local: ' ' }, { servico: galeria, segunda: seg }).erro, 'Informe o local.')
 conferir('quantidade zero recusa', validarAtividade({ ...campos, quantidade_planejada: '0' }, { servico: galeria, segunda: seg }).erro, 'Informe a quantidade planejada.')
 conferir('pacote de outro serviço recusa', validarAtividade(campos, { servico: galeria, segunda: seg, pacote: { id: 6, servico_id: 25 } }).erro, 'Esse pacote não é deste serviço ou já foi fechado.')
+conferir('atividade nova num dia que já passou: recusa', validarAtividade({ ...campos, data_prevista: '2026-10-06' }, { servico: galeria, segunda: seg, hoje: '2026-10-07', nova: true }).erro, 'Não dá para planejar um dia que já passou.')
+conferir('editar atividade de um dia que já passou: pode', validarAtividade({ ...campos, data_prevista: '2026-10-06' }, { servico: galeria, segunda: seg, hoje: '2026-10-07', nova: false }).erro, undefined)
 conferir('pacote fechado recusa', validarAtividade(campos, { servico: galeria, segunda: seg, pacote: { id: 3, servico_id: 22, fechado_em: '2026-09-20' } }).erro, 'Esse pacote não é deste serviço ou já foi fechado.')
 
 const semana = [
@@ -61,11 +70,12 @@ const semana = [
   { id: 3, semana_inicio: seg, data_prevista: '2026-10-08', servico_id: 24, local: 'Rua 3', quantidade_planejada: 80, quantidade_executada: 0, status: 'Não concluída', pacote_id: 5 },
 ]
 const pacotesAbertos = [{ id: 3, fechado_em: null }, { id: 5, fechado_em: '2026-10-08' }]
-const copias = copiarPendentes(semana, pacotesAbertos, seg)
+const copias = copiarPendentes(semana, pacotesAbertos, seg, '2026-10-07')
 conferir('copia as duas não concluídas', copias.map((c) => c.copiada_de_id), [1, 3])
 conferir('cópia: mesmo dia da semana seguinte, com o saldo', copias[0], { semana_inicio: '2026-10-12', data_prevista: '2026-10-13', servico_id: 22, local: 'Rua 2', quantidade_planejada: 25, equipe: 'Eq. Raimundo', pacote_id: 3, copiada_de_id: 1 })
 conferir('cópia: pacote fechado fica de fora', copias[1].pacote_id, null)
-conferir('não copia duas vezes', copiarPendentes([...semana, { id: 9, copiada_de_id: 1 }], pacotesAbertos, seg).map((c) => c.copiada_de_id), [3])
+conferir('cópia que cairia num dia passado não é criada', copiarPendentes(semana, pacotesAbertos, seg, '2026-10-14').map((c) => c.copiada_de_id), [3])
+conferir('não copia duas vezes', copiarPendentes([...semana, { id: 9, copiada_de_id: 1 }], pacotesAbertos, seg, '2026-10-07').map((c) => c.copiada_de_id), [3])
 
 // ── Restrições ──
 conferir('restrição válida', validarRestricao({ tipo: 'Material', descricao: ' Tubos ', responsavel: '', data_limite: '' }),
@@ -77,7 +87,8 @@ conferir('remover sem data', validarRemocao('', '2026-10-05').erro, 'Informe a d
 conferir('remover com data futura', validarRemocao('2026-10-06', '2026-10-05').erro, 'A data não pode ser futura.')
 
 // ── Grupos macro dos motivos ──
-import { GRUPOS_MOTIVO, MOTIVOS_NAO_CONCLUSAO } from '../src/lib/vocabulario.js'
+import { GRUPOS_MOTIVO } from '../src/lib/vocabulario.js'
+const MOTIVOS_NAO_CONCLUSAO = Object.values(GRUPOS_MOTIVO).flat()
 conferir('sete grupos', Object.keys(GRUPOS_MOTIVO), ['Condição climática', 'Execução', 'Planejamento', 'Projetos', 'Suprimentos', 'Segurança', 'Outros'])
 conferir('cada causa em um grupo só', MOTIVOS_NAO_CONCLUSAO.length, new Set(MOTIVOS_NAO_CONCLUSAO).size)
 conferir('chuva é condição climática', grupoDoMotivo('Chuva'), 'Condição climática')

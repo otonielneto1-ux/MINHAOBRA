@@ -125,6 +125,18 @@ export function useCarga(carregar, deps = []) {
   return { ...estado, recarregar }
 }
 
+// Ao abrir uma janela (a chave passa a ter valor, ou muda), roda `iniciar` uma vez para o formulário
+// recomeçar com os dados novos. Roda durante a renderização (o jeito do React para estado que depende
+// de prop), sem efeito e sem piscar.
+export function useAoAbrir(chave, iniciar) {
+  const [aberta, setAberta] = useState(null)
+  if (chave && aberta !== chave) {
+    setAberta(chave)
+    iniciar()
+  }
+  if (!chave && aberta !== null) setAberta(null)
+}
+
 // ── Folha (janela por cima da tela; no celular sobe de baixo) ────────────
 export function Folha({ aberta, fechar, children, rotulo }) {
   const caixa = useRef(null)
@@ -224,7 +236,7 @@ export function Pizza({ titulo, fatias, vazio }) {
   })
   const sel = ativa === null ? null : fatias[ativa]
   const eventos = (i) => ({
-    onMouseEnter: () => setAtiva(i), onMouseLeave: () => setAtiva(null), onClick: () => setAtiva(ativa === i ? null : i),
+    onMouseEnter: () => setAtiva(i), onMouseLeave: () => setAtiva(null), onClick: () => setAtiva(i), // no celular o toque também dispara o "mouse entrou": alternar apagaria na hora
   })
 
   return (

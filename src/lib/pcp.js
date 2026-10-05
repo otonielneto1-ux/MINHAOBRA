@@ -1,9 +1,9 @@
 // Regras do PCP (planejamento da semana). PLANO-DO-PROJETO.md, "4a. PCP".
 
-import { GRUPOS_MOTIVO, STATUS_PCP, STATUS_RESTRICAO, TIPOS_RESTRICAO } from './vocabulario.js'
+import { GRUPOS_MOTIVO, ORIGEM_PRODUCAO, STATUS_PCP, STATUS_RESTRICAO, TIPOS_RESTRICAO } from './vocabulario.js'
 import { diasDaSemana, diasEntre, diasUteisEntre, inicioDoMesAnterior, segundaDaSemana, somarDias } from './datas.js'
 import { diasAtraso } from './avanco.js'
-import { lerNumero } from './formato.js'
+import { arredondar as arredondarCasas, lerNumero } from './formato.js'
 
 // Decide o resultado de uma baixa. Devolve { status, motivo } ou { erro }.
 // A mesma regra roda no banco (função dar_baixa): mudou uma, mude a outra.
@@ -17,6 +17,17 @@ export function resultadoBaixa(planejada, executada, motivo, equipe) {
   if (!motivo) return { erro: 'Escolha o motivo de não concluir.' }
   return { status: STATUS_PCP.NAO_CONCLUIDA, motivo }
 }
+
+// Prévia na janela de baixa, antes de salvar: com essa quantidade, a atividade fica concluída ou não?
+// null enquanto o campo não tem número válido.
+export function previaBaixa(planejada, executada) {
+  const exec = lerNumero(executada)
+  if (exec === null || Number.isNaN(exec) || exec < 0) return null
+  return exec >= Number(planejada) ? STATUS_PCP.CONCLUIDA : STATUS_PCP.NAO_CONCLUIDA
+}
+
+// Equipe para mostrar: depois da baixa, a que executou; antes, a planejada.
+export const equipeDaAtividade = (a) => a.equipe_executou || a.equipe || null
 
 // Meta de PPC (proposta; "Decidir depois de usar").
 export const META_PPC = 80
@@ -68,11 +79,14 @@ export function saldoPendente(atividade) {
   return Math.max(0, Number(atividade.quantidade_planejada) - Number(atividade.quantidade_executada || 0))
 }
 
-// Serviços que começam ou continuam entre `de` e `ate` e ainda não terminaram (plano de 3 meses).
-export function servicosNoPeriodo(servicos, de, ate) {
-  return servicos.filter((s) => !s.e_resumo && !s.cancelado && !s.fim_real
-    && s.inicio_previsto <= ate && s.fim_previsto >= de)
+// PPC de cada uma das últimas `n` semanas até a da tela (a mais antiga primeiro).
+export function ppcPorSemana(atividades, segunda, hoje, n = 8) {
+  return Array.from({ length: n }, (_, i) => somarDias(segunda, -7 * (n - 1 - i)))
+    .map((s) => ({ semana_inicio: s, ...ppcAte(atividades.filter((a) => a.semana_inicio === s), hoje) }))
 }
+
+// Restrição pendente com data limite que já passou.
+export const restricaoVencida = (r, hoje) => r.status === STATUS_RESTRICAO.PENDENTE && !!r.data_limite && r.data_limite < hoje
 
 // Contagem de motivos de não conclusão, do mais frequente para o menos.
 export function contarMotivos(atividades) {
@@ -115,16 +129,18 @@ export function motivosPorGrupo(atividades, mes) {
 
 // Arredonda a quantidade sugerida: % com 1 casa, as demais unidades com 2.
 const arredondar = (v, unidade) => {
-  const casas = unidade === '%' ? 10 : 100
-  return Math.max(1 / casas, Math.round(v * casas) / casas)
+  const casas = unidade === '%' ? 1 : 2
+  return Math.max(1 / 10 ** casas, arredondarCasas(v, casas))
 }
 
 // Atividade nova ou editada (PRD-FRONTEND, "Campos da atividade"). Devolve { registro } ou { erro }.
-export function validarAtividade(campos, { servico, pacote, segunda }) {
+// Atividade nova só de hoje em diante (o banco confere o mesmo na política pcp_criar).
+export function validarAtividade(campos, { servico, pacote, segunda, hoje, nova }) {
   if (!servico) return { erro: 'Escolha o serviço.' }
   if (servico.e_resumo || servico.cancelado) return { erro: 'Esse serviço não recebe atividade.' }
   const d = campos.data_prevista
   if (!d || d < segunda || d > somarDias(segunda, 5)) return { erro: 'Escolha um dia desta semana (segunda a sábado).' }
+  if (nova && d < hoje) return { erro: 'Não dá para planejar um dia que já passou.' }
   if (!campos.local?.trim()) return { erro: 'Informe o local.' }
   const q = lerNumero(campos.quantidade_planejada)
   if (!(q > 0)) return { erro: 'Informe a quantidade planejada.' }
@@ -175,7 +191,7 @@ export function linhasTresMeses(servicos, semanas, hoje) {
       const atraso = diasAtraso(s, hoje)
       const ativas = semanas.filter((seg) => s.inicio_previsto <= somarDias(seg, 5)
         && (s.fim_previsto >= seg || (atraso > 0 && seg === semanas[0])))
-      return { servico: s, atraso, ativas, atividades: [] }
+      return { servico: s, atraso, ativas }
     })
     .filter((l) => l.ativas.length > 0)
     .sort((a, b) => (b.atraso > 0) - (a.atraso > 0) || b.atraso - a.atraso || porEap(a, b))
@@ -185,19 +201,22 @@ export function linhasTresMeses(servicos, semanas, hoje) {
 // (até o domingo anterior) e acumulado executado até o fim dela.
 export function acumuladosDaSemana(servico, producoes, segunda) {
   const doServico = producoes.filter((p) => p.servico_id === servico.id)
-  const ate = (dia) => Math.round(doServico.filter((p) => p.data <= dia).reduce((t, p) => t + Number(p.quantidade), 0) * 1000) / 1000
-  return { total: Number(servico.quantidade_prevista), anterior: ate(somarDias(segunda, -1)), executado: ate(somarDias(segunda, 6)) }
+  const ate = (dia) => arredondarCasas(doServico.filter((p) => p.data <= dia).reduce((t, p) => t + Number(p.quantidade), 0), 3)
+  const total = Number(servico.quantidade_prevista)
+  const executado = ate(somarDias(segunda, 6))
+  return { total, anterior: ate(somarDias(segunda, -1)), executado, pct: total ? Math.min(100, (executado / total) * 100) : 0 }
 }
 
 // Melhor média diária do serviço nas 4 semanas completas antes da atual:
-// em cada semana, produção ÷ dias em que houve produção. null se não houve produção.
+// em cada semana, produção das baixas ÷ dias com baixa. Ajuste de medição não é ritmo e fica de fora.
+// null se não houve produção.
 export function melhorRitmo(producoes, servicoId, hoje) {
   const atual = segundaDaSemana(hoje)
   let melhor = null
   for (let i = 1; i <= 4; i++) {
     const de = somarDias(atual, -7 * i)
     const ate = somarDias(de, 6)
-    const daSemana = producoes.filter((p) => p.servico_id === servicoId && p.data >= de && p.data <= ate)
+    const daSemana = producoes.filter((p) => p.servico_id === servicoId && p.origem === ORIGEM_PRODUCAO.PCP && p.data >= de && p.data <= ate)
     const dias = new Set(daSemana.filter((p) => Number(p.quantidade) > 0).map((p) => p.data)).size
     if (!dias) continue
     const media = daSemana.reduce((t, p) => t + Number(p.quantidade), 0) / dias
@@ -280,7 +299,8 @@ export const conferenciaOk = (respostas) => CONFERENCIA_INICIO.every((_, i) => r
 
 // "Copiar pendentes para a próxima semana": cada Não concluída vira uma atividade no mesmo dia da
 // semana seguinte, com o saldo. Pacote fechado no meio do caminho fica de fora. Não copia duas vezes.
-export function copiarPendentes(atividades, pacotes, segunda) {
+// Cópia que cairia num dia que já passou não é criada (planejar é de hoje em diante).
+export function copiarPendentes(atividades, pacotes, segunda, hoje) {
   const jaCopiadas = new Set(atividades.map((a) => a.copiada_de_id).filter(Boolean))
   return atividades
     .filter((a) => a.semana_inicio === segunda && a.status === STATUS_PCP.NAO_CONCLUIDA && !jaCopiadas.has(a.id))
@@ -293,6 +313,7 @@ export function copiarPendentes(atividades, pacotes, segunda) {
         pacote_id: pacote && !pacote.fechado_em ? pacote.id : null, copiada_de_id: a.id,
       }
     })
+    .filter((c) => c.data_prevista >= hoje)
 }
 
 // ── Restrições (plano de 3 meses) ──────────────────────────────────────────

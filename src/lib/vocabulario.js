@@ -28,9 +28,10 @@ export const GRUPOS_MOTIVO = {
   'Outros': ['Outro'],
 }
 
-export const MOTIVOS_NAO_CONCLUSAO = Object.values(GRUPOS_MOTIVO).flat()
 
 export const STATUS_PCP = { PLANEJADA: 'Planejada', CONCLUIDA: 'Concluída', NAO_CONCLUIDA: 'Não concluída' }
+
+export const ORIGEM_PRODUCAO = { PCP: 'PCP', AJUSTE: 'Ajuste' }
 
 export const STATUS_PACOTE = ['Planejado', 'Liberado', 'Em execução', 'Concluído', 'Não concluído']
 

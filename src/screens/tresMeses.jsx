@@ -5,12 +5,12 @@ import { useState } from 'react'
 import { useObra } from '../lib/ObraContext.jsx'
 import * as dados from '../lib/dados.js'
 import { pode } from '../lib/permissoes.js'
-import { linhasTresMeses, servicosNoPeriodo, validarRemocao, validarRestricao } from '../lib/pcp.js'
+import { linhasTresMeses, restricaoVencida, validarRemocao, validarRestricao } from '../lib/pcp.js'
 import { avancoServico } from '../lib/avanco.js'
 import { dataBr, diaMes, segundaDaSemana, somarDias } from '../lib/datas.js'
 import { porcento } from '../lib/formato.js'
 import { STATUS_RESTRICAO, TIPOS_RESTRICAO } from '../lib/vocabulario.js'
-import { Carregando, ErroCaixa, Folha, Status, useAviso, useCarga } from '../components/index.jsx'
+import { Carregando, ErroCaixa, Folha, Status, useAoAbrir, useAviso, useCarga } from '../components/index.jsx'
 
 async function carregar() {
   const r = await Promise.all([dados.listarServicos(), dados.listarRestricoes(), dados.listarEtapas()])
@@ -46,11 +46,12 @@ export default function TresMeses({ goto, usuario }) {
     .filter((s) => etapa === null || s.etapa_entrega_id === etapa)
     .filter((s) => !soComRestricao || pendentes(s.id).length > 0)
   const gestao = pode(usuario.role, 'editarPlanejamento')
-  const blocos = semanas
-    .map((seg) => ({ seg, lista: filtrar(servicosNoPeriodo(data.servicos, seg, somarDias(seg, 5))) }))
-    .filter((b) => b.lista.length > 0)
+  // Uma regra só para o computador (tabela) e o celular (lista por semana).
   const naJanela = new Set(filtrar(data.servicos).map((s) => s.id))
   const linhas = linhasTresMeses(data.servicos, semanas, dia).filter((l) => naJanela.has(l.servico.id))
+  const blocos = semanas
+    .map((seg) => ({ seg, lista: linhas.filter((l) => l.ativas.includes(seg)).map((l) => l.servico) }))
+    .filter((b) => b.lista.length > 0)
   const etapaDe = (s) => data.etapas.find((e) => e.id === s.etapa_entrega_id)?.nome
 
   return (
@@ -78,7 +79,7 @@ export default function TresMeses({ goto, usuario }) {
             <tbody>
               {linhas.map(({ servico: s, atraso, ativas }) => {
                 const n = pendentes(s.id).length
-                const vencida = pendentes(s.id).some((r) => r.data_limite && r.data_limite < dia)
+                const vencida = pendentes(s.id).some((r) => restricaoVencida(r, dia))
                 return (
                   <tr key={s.id} className={`clicavel ${atraso > 0 ? 'atrasada' : ''}`} tabIndex={0}
                     onClick={() => setAberto({ servico: s, seg: ativas[0] })}
@@ -122,7 +123,7 @@ export default function TresMeses({ goto, usuario }) {
           {aberta && <div className="lista">
             {lista.map((s) => {
               const n = pendentes(s.id).length
-              const vencida = pendentes(s.id).some((r) => r.data_limite && r.data_limite < dia)
+              const vencida = pendentes(s.id).some((r) => restricaoVencida(r, dia))
               return (
                 <button key={s.id} className="linha" onClick={() => setAberto({ servico: s, seg })}>
                   <div className="linha-main">
@@ -158,15 +159,12 @@ function FolhaServico({ aberto, restricoes, semanas, gestao, dia, fechar, salvo,
   const [semanaPcp, setSemanaPcp] = useState(null)
   const [erro, setErro] = useState(null)
   const [salvando, setSalvando] = useState(false)
-  const [abertoPara, setAbertoPara] = useState(null)
 
-  if (aberto && abertoPara !== aberto) {
-    setAbertoPara(aberto)
+  useAoAbrir(aberto, () => {
     setModo(null)
     setSemanaPcp(aberto.seg)
     setErro(null)
-  }
-  if (!aberto && abertoPara !== null) setAbertoPara(null)
+  })
   if (!aberto) return null
 
   const s = aberto.servico
@@ -255,7 +253,7 @@ function FolhaServico({ aberto, restricoes, semanas, gestao, dia, fechar, salvo,
             {lista.length === 0 && <p className="vazio-curto">Nenhuma restrição cadastrada para este serviço.</p>}
             {lista.map((r) => {
               const removida = r.status === STATUS_RESTRICAO.REMOVIDA
-              const vencida = !removida && r.data_limite && r.data_limite < dia
+              const vencida = restricaoVencida(r, dia)
               return (
                 <div key={r.id} className="linha" style={{ flexWrap: 'wrap' }}>
                   <span className={`marca ${removida ? '' : vencida ? 'crit' : 'warn'}`} style={removida ? { background: 'var(--green)' } : undefined} />

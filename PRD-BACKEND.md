@@ -278,7 +278,8 @@ O planejamento da semana.
 | pacote_id | int8 | não | → pacotes |
 | local | text | sim | |
 | quantidade_planejada | numeric(14,3) | sim | maior que zero |
-| equipe | text | não | ex.: "Equipe do Raimundo" |
+| equipe | text | não | equipe planejada; ex.: "Equipe do Raimundo" |
+| equipe_executou | text | não | equipe que fez, informada na baixa (obrigatória nela); não apaga a planejada |
 | status | text | sim | CHECK: Planejada, Concluída, Não concluída; padrão Planejada |
 | quantidade_executada | numeric(14,3) | não | informada na baixa |
 | motivo_nao_conclusao | text | não | CHECK: lista de motivos; obrigatório quando Não concluída |
@@ -288,7 +289,8 @@ O planejamento da semana.
 
 **Índices úteis:** (obra_id, semana_inicio), (obra_id, data_prevista).
 **Regras:**
-- Na baixa: executada ≥ planejada → Concluída; executada < planejada → Não concluída com motivo obrigatório.
+- Atividade nova só de hoje em diante; editar e excluir só enquanto Planejada (o banco confere).
+- Na baixa: executada ≥ planejada → Concluída; executada < planejada → Não concluída com motivo obrigatório; a equipe que fez é obrigatória.
 - A baixa cria (ou atualiza) uma linha em `producoes` com origem "PCP" e a quantidade executada. Desfazer a baixa apaga essa produção.
 - O Mestre só altera a baixa até o fim do dia seguinte à `data_prevista`.
 

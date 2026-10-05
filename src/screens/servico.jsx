@@ -6,11 +6,11 @@ import * as dados from '../lib/dados.js'
 import { pode } from '../lib/permissoes.js'
 import { avancoServico, diasAtraso } from '../lib/avanco.js'
 import { contarMotivos } from '../lib/pcp.js'
-import { previaTrocaUnidade, validarAjuste } from '../lib/cronograma.js'
+import { previaTrocaUnidade, validarAjuste, validarCusto } from '../lib/cronograma.js'
 import { UNIDADES } from '../lib/vocabulario.js'
 import { dataBr } from '../lib/datas.js'
-import { lerNumero, moeda, porcento, quantidade } from '../lib/formato.js'
-import { Barra, Cabecalho, Carregando, ErroCaixa, Folha, Secao, Status, useAviso, useCarga } from '../components/index.jsx'
+import { moeda, porcento, quantidade } from '../lib/formato.js'
+import { Barra, Cabecalho, Carregando, ErroCaixa, Folha, Secao, Status, useAoAbrir, useAviso, useCarga } from '../components/index.jsx'
 
 async function carregar(id) {
   const r = await Promise.all([
@@ -145,14 +145,11 @@ function FolhaAcao({ acao, servico: s, verCusto, dia, fechar, salvo }) {
   const [campos, setCampos] = useState({})
   const [erro, setErro] = useState(null)
   const [salvando, setSalvando] = useState(false)
-  const [abertaPara, setAbertaPara] = useState(null)
 
-  if (acao && abertaPara !== acao) {
-    setAbertaPara(acao)
+  useAoAbrir(acao, () => {
     setCampos({ quantidade: '', data: dia, motivo: '', custo: s.custo_orcado ?? '', local: s.local ?? '', unidade: 'm' })
     setErro(null)
-  }
-  if (!acao && abertaPara !== null) setAbertaPara(null)
+  })
 
   const mudar = (k, v) => { setCampos((c) => ({ ...c, [k]: v })); setErro(null) }
   const previa = acao === 'unidade' ? previaTrocaUnidade(s, campos.unidade, campos.quantidade) : null
@@ -164,9 +161,9 @@ function FolhaAcao({ acao, servico: s, verCusto, dia, fechar, salvo }) {
       if (v.erro) { setErro(v.erro); return }
       r = () => dados.lancarAjuste(v.registro)
     } else if (acao === 'editar') {
-      const custo = lerNumero(campos.custo)
-      if (verCusto && (Number.isNaN(custo) || custo < 0)) { setErro('Custo inválido.'); return }
-      r = () => dados.editarServico(s.id, verCusto ? { custo_orcado: custo || null, local: campos.local } : { local: campos.local })
+      const c = verCusto ? validarCusto(campos.custo) : null
+      if (c?.erro) { setErro(c.erro); return }
+      r = () => dados.editarServico(s.id, verCusto ? { custo_orcado: c.custo, local: campos.local } : { local: campos.local })
     } else {
       if (previa.erro) { setErro(previa.erro); return }
       r = () => dados.trocarUnidade(s.id, campos.unidade, previa.prevista)

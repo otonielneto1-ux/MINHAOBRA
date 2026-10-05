@@ -13,6 +13,7 @@ import { calcularCronograma } from './cronograma.js'
 import { resumoAvanco, curvaS } from './avanco.js'
 import { servicosAtrasados } from './alertas.js'
 import { tipoDeImagemValido } from './imagem.js'
+import { ORIGEM_PRODUCAO, STATUS_PCP } from './vocabulario.js'
 
 let obraAtualId = null
 let usuarioAtual = null
@@ -21,6 +22,7 @@ export function definirObraAtual(id) { obraAtualId = id }
 export function definirUsuario(profile) { usuarioAtual = profile }
 
 export const hoje = () => paraIso(new Date())
+export const agora = () => new Date().toISOString()
 export const horaAgora = () => new Date().getHours()
 
 const role = () => usuarioAtual?.role
@@ -141,7 +143,7 @@ export const importarCronograma = (carga) => recusa('importarCronograma', 'Seu p
 // Recalcula caminho crítico, folga e atrasos (lib/cronograma.js) e grava.
 // Com problema (ciclo, serviço sem data), nada é gravado: devolve { problemas } para a tela listar.
 export async function recalcularCronograma() {
-  if (!pode(role(), 'importarCronograma')) return falha('Seu perfil não recalcula o cronograma.')
+  if (!pode(role(), 'editarCronograma')) return falha('Seu perfil não recalcula o cronograma.')
   const [s, d] = await Promise.all([listarServicos(), listarDependencias()])
   if (s.erro || d.erro) return falha(s.erro || d.erro)
   const r = calcularCronograma(s.data, d.data, hoje())
@@ -151,12 +153,12 @@ export async function recalcularCronograma() {
 }
 
 // linhas: custosAlterados() de lib/cronograma.js.
-export const salvarCustos = (linhas) => recusa('verCusto', 'Seu perfil não edita custos.')
+export const salvarCustos = (linhas) => recusa('editarCronograma', 'Seu perfil não edita custos.')
   ?? q(supabase.rpc('salvar_custos', { p_obra: obraAtualId, p_linhas: linhas }))
 
 // Custo orçado e/ou local, no detalhe do serviço (campo ausente não muda).
 export function editarServico(id, { custo_orcado, local }) {
-  if (!pode(role(), 'editarPlanejamento')) return Promise.resolve(falha('Seu perfil não edita serviços.'))
+  if (!pode(role(), 'editarCronograma')) return Promise.resolve(falha('Seu perfil não edita serviços.'))
   const campos = {}
   if (custo_orcado !== undefined) campos.custo_orcado = custo_orcado
   if (local !== undefined) campos.local = local.trim() || null
@@ -165,9 +167,9 @@ export function editarServico(id, { custo_orcado, local }) {
 
 // registro: validarAjuste() de lib/cronograma.js.
 export const lancarAjuste = (registro) => recusa('lancarAjuste', 'Seu perfil não lança ajuste.')
-  ?? q(supabase.from('producoes').insert({ ...registro, obra_id: obraAtualId, origem: 'Ajuste', lancado_por: usuarioAtual.id }))
+  ?? q(supabase.from('producoes').insert({ ...registro, obra_id: obraAtualId, origem: ORIGEM_PRODUCAO.AJUSTE, lancado_por: usuarioAtual.id }))
 
-export const trocarUnidade = (servicoId, unidade, quantidade) => recusa('lancarAjuste', 'Seu perfil não troca a unidade.')
+export const trocarUnidade = (servicoId, unidade, quantidade) => recusa('editarCronograma', 'Seu perfil não troca a unidade.')
   ?? q(supabase.rpc('trocar_unidade', { p_servico: servicoId, p_unidade: unidade, p_quantidade: quantidade }))
 
 // ── Restrições (plano de 3 meses) ────────────────────────────────────────
@@ -234,13 +236,13 @@ export const criarAtividades = (registros) => recusa('editarPlanejamento', 'Seu 
 // Editar e excluir só enquanto Planejada; sem linha alterada = já recebeu baixa.
 export async function editarAtividade(id, registro) {
   if (!pode(role(), 'editarPlanejamento')) return falha('Seu perfil não planeja a semana.')
-  const r = await q(supabase.from('pcp_atividades').update(registro).eq('id', id).eq('obra_id', obraAtualId).eq('status', 'Planejada').select('id'))
+  const r = await q(supabase.from('pcp_atividades').update(registro).eq('id', id).eq('obra_id', obraAtualId).eq('status', STATUS_PCP.PLANEJADA).select('id'))
   return r.erro || r.data.length ? r : falha('Essa atividade já recebeu baixa e não pode ser editada.')
 }
 
 export async function excluirAtividade(id) {
   if (!pode(role(), 'editarPlanejamento')) return falha('Seu perfil não planeja a semana.')
-  const r = await q(supabase.from('pcp_atividades').delete().eq('id', id).eq('obra_id', obraAtualId).eq('status', 'Planejada').select('id'))
+  const r = await q(supabase.from('pcp_atividades').delete().eq('id', id).eq('obra_id', obraAtualId).eq('status', STATUS_PCP.PLANEJADA).select('id'))
   return r.erro || r.data.length ? r : falha('Essa atividade já recebeu baixa e não pode ser excluída.')
 }
 

@@ -88,8 +88,8 @@ export function compararImportacao(lido, atuais) {
     const mudou = []
     if (s.nome !== t.nome) mudou.push({ campo: 'nome', de: s.nome, para: t.nome })
     if (s.codigo_eap !== t.eap) mudou.push({ campo: 'EAP', de: s.codigo_eap, para: t.eap })
-    if (s.inicio_previsto !== t.inicio) mudou.push({ campo: 'início', de: s.inicio_previsto, para: t.inicio })
-    if (s.fim_previsto !== t.fim) mudou.push({ campo: 'fim', de: s.fim_previsto, para: t.fim })
+    if (s.inicio_previsto !== t.inicio) mudou.push({ campo: 'início', de: s.inicio_previsto, para: t.inicio, data: true })
+    if (s.fim_previsto !== t.fim) mudou.push({ campo: 'fim', de: s.fim_previsto, para: t.fim, data: true })
     if (s.cancelado) mudou.push({ campo: 'situação', de: 'cancelado', para: 'ativo' })
     if (mudou.length) alterados.push({ tarefa: t, servico: s, mudou })
   }

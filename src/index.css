@@ -462,6 +462,14 @@ select.ipt { padding-right: 8px; }
 .conf-linha { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 15px; }
 .conf-linha .chave { min-height: 38px; }
 
+/* PPC das últimas semanas */
+.ppc-semana { display: grid; grid-template-columns: 54px 1fr 52px; gap: 12px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+.ppc-semana:first-of-type { border-top: 0; }
+.ppc-semana b { text-align: right; font-weight: 600; }
+
+/* Serviço cancelado no cronograma (sumiu do Project) */
+.tabela tr.cancelado td { text-decoration: line-through; color: var(--muted); }
+
 /* Pizza dos motivos (grupos macro) */
 .pizzas { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
 .pizza-corpo { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 10px; }
@@ -478,10 +486,9 @@ select.ipt { padding-right: 8px; }
 .cel-semana i { display: block; height: 14px; }
 .cel-semana i.ativo { background: var(--primary); }
 .cel-semana i.ativo.crit { background: var(--red); }
-.cel-semana i.ativo.feito { background: var(--green); }
 .tres-tabela th.hoje, .tres-tabela td.hoje { background: var(--primary-tint); }
 .tres-tabela tr.atrasada td.nome { box-shadow: inset 4px 0 0 var(--red); }
 
-/* Lista com caixa de marcar (puxar do plano de 3 meses) */
+/* Lista com caixa de marcar (distribuir na semana) */
 .marcar { cursor: pointer; }
 .marcar input { width: 22px; height: 22px; flex: none; accent-color: var(--primary); }

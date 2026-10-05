@@ -23,6 +23,7 @@ export default function Importar({ goto }) {
   const { data, erro, carregando, recarregar } = useCarga(carregar, [obra.id])
   const [lido, setLido] = useState(null)
   const [erroArquivo, setErroArquivo] = useState(null)
+  const [topo, setTopo] = useState([])
   const [etapaDoTopo, setEtapaDoTopo] = useState({})
   const [usarBase, setUsarBase] = useState(true)
   const [gravando, setGravando] = useState(false)
@@ -38,12 +39,13 @@ export default function Importar({ goto }) {
     const r = lerXmlDoProject(await arquivo.text())
     if (r.erro) { setErroArquivo(r.erro); setLido(null); return }
     setErroArquivo(null)
+    const casadas = casarEtapas(r.tarefas, data.etapas)
     setLido(r)
-    setEtapaDoTopo(Object.fromEntries(casarEtapas(r.tarefas, data.etapas).map((t) => [t.uid, t.etapa_id])))
+    setTopo(casadas)
+    setEtapaDoTopo(Object.fromEntries(casadas.map((t) => [t.uid, t.etapa_id])))
   }
 
   const previa = lido && compararImportacao(lido, data.servicos)
-  const topo = lido ? casarEtapas(lido.tarefas, data.etapas) : []
   const semEtapa = topo.filter((t) => !etapaDoTopo[t.uid]).length
 
   async function confirmar() {
@@ -120,7 +122,7 @@ export default function Importar({ goto }) {
                   <div key={`a${a.tarefa.uid}`} className="linha">
                     <div className="linha-main">
                       <div className="linha-titulo">{a.tarefa.eap} · {a.tarefa.nome}</div>
-                      <div className="meta">{a.mudou.map((m) => `${m.campo}: ${m.campo === 'início' || m.campo === 'fim' ? `${dataBr(m.de)} → ${dataBr(m.para)}` : `${m.de} → ${m.para}`}`).join(' · ')}</div>
+                      <div className="meta">{a.mudou.map((m) => `${m.campo}: ${m.data ? `${dataBr(m.de)} → ${dataBr(m.para)}` : `${m.de} → ${m.para}`}`).join(' · ')}</div>
                     </div>
                   </div>
                 ))}

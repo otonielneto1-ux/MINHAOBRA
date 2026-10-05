@@ -3,7 +3,7 @@
 
 import { diasEntre, somarDias } from './datas.js'
 import { diasAtraso } from './avanco.js'
-import { lerNumero } from './formato.js'
+import { arredondar, lerNumero } from './formato.js'
 
 // Recalcula folga, crítico e atraso (PRD-BACKEND, "Recalcular o cronograma"), em dias corridos.
 // Ida: cada serviço começa no previsto do Project ou depois, se uma predecessora empurrar.
@@ -93,6 +93,13 @@ export function calcularCronograma(servicos, dependencias, hoje) {
   }
 }
 
+// Custo orçado digitado: vazio ou zero = sem custo (null); negativo ou texto = inválido. Centavos arredondados.
+export function validarCusto(texto) {
+  const v = lerNumero(texto)
+  if (Number.isNaN(v) || (v !== null && v < 0)) return { erro: 'Custo inválido.' }
+  return { custo: v === null || v === 0 ? null : arredondar(v, 2) }
+}
+
 // Custos digitados no modo planilha → só as linhas que mudaram, prontas para gravar.
 // Campo vazio = sem custo (null). Devolve { erro } se algum valor não for número positivo.
 export function custosAlterados(servicos, digitados) {
@@ -100,9 +107,8 @@ export function custosAlterados(servicos, digitados) {
   for (const [id, texto] of Object.entries(digitados)) {
     const s = servicos.find((x) => String(x.id) === id)
     if (!s) continue
-    const v = lerNumero(texto)
-    if (Number.isNaN(v) || (v !== null && v < 0)) return { erro: `Custo inválido em "${s.nome}".` }
-    const novo = v === null || v === 0 ? null : Math.round(v * 100) / 100
+    const { custo: novo, erro } = validarCusto(texto)
+    if (erro) return { erro: `Custo inválido em "${s.nome}".` }
     const antigo = Number(s.custo_orcado) > 0 ? Number(s.custo_orcado) : null
     if (novo !== antigo) linhas.push({ id: s.id, custo: novo })
   }
@@ -127,5 +133,5 @@ export function previaTrocaUnidade(servico, unidade, quantidade) {
   const q = lerNumero(quantidade)
   if (!(q > 0)) return { erro: 'Informe a quantidade prevista.' }
   const fator = q / Number(servico.quantidade_prevista)
-  return { fator, executada: Math.round(Number(servico.quantidade_executada) * fator * 1000) / 1000, prevista: q }
+  return { fator, executada: arredondar(Number(servico.quantidade_executada) * fator, 3), prevista: q }
 }

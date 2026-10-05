@@ -14,6 +14,7 @@ const MATRIZ = {
   verCronograma: [...GESTAO, MESTRE],
   editarPlanejamento: GESTAO,
   importarCronograma: GESTAO,
+  editarCronograma: GESTAO, // custos, local, unidade e recálculo
   lancarAjuste: GESTAO,
   verProducao: [...GESTAO, MESTRE],
   darBaixa: [...GESTAO, MESTRE],

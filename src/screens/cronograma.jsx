@@ -11,7 +11,7 @@ import { lerNumero, moeda, numero, porcento } from '../lib/formato.js'
 import { Carregando, ErroCaixa, Folha, Icone, Status, Vazio, useAviso, useCarga } from '../components/index.jsx'
 
 async function carregar() {
-  const r = await Promise.all([dados.listarServicos(), dados.listarEtapas()])
+  const r = await Promise.all([dados.listarServicos({ incluirCancelados: true }), dados.listarEtapas()])
   const erro = r.find((x) => x.erro)?.erro
   if (erro) return { data: null, erro }
   return { data: { servicos: r[0].data, etapas: r[1].data }, erro: null }
@@ -22,7 +22,7 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
   const aviso = useAviso()
   const dia = dados.hoje()
   const [etapa, setEtapa] = useState(null)
-  const [chaves, setChaves] = useState({ criticos: false, atrasados: false, semCusto: soSemCusto })
+  const [chaves, setChaves] = useState({ criticos: false, atrasados: false, semCusto: soSemCusto, cancelados: false })
   const [editando, setEditando] = useState(false)
   const [digitados, setDigitados] = useState({})
   const [ocupado, setOcupado] = useState(false)
@@ -36,7 +36,9 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
   const verCusto = pode(usuario.role, 'verCusto')
   const gestao = pode(usuario.role, 'importarCronograma')
 
-  if (!data.servicos.some((s) => !s.e_resumo)) {
+  // Cancelado = sumiu do Project numa reimportação: fica fora das contas e só aparece (riscado) se pedir.
+  const ativos = data.servicos.filter((s) => !s.cancelado)
+  if (!ativos.some((s) => !s.e_resumo)) {
     return <Vazio icone="planejamento" titulo="Nenhum serviço ainda" texto="Importe o arquivo do MS Project (Arquivo › Salvar como › XML)."
       acao={gestao ? { texto: 'Importar do Project', fn: () => goto('importar') } : null} />
   }
@@ -47,6 +49,7 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
   const largura = (a, b) => Math.max(0.6, pos(b) - pos(a))
 
   const linhas = data.servicos.filter((s) => {
+    if (s.cancelado && !chaves.cancelados) return false
     if (s.e_resumo) return etapa === null || s.etapa_entrega_id === etapa
     if (etapa !== null && s.etapa_entrega_id !== etapa) return false
     if (chaves.criticos && !s.critico) return false
@@ -58,12 +61,12 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
   const visiveis = filtrando ? linhas.filter((s) => !s.e_resumo) : linhas
   // No modo planilha, o rodapé soma o que está digitado (o que não foi tocado vale o salvo).
   const custoAtual = (s) => (s.id in digitados ? lerNumero(digitados[s.id]) : Number(s.custo_orcado))
-  const comCusto = data.servicos.filter((s) => !s.e_resumo && custoAtual(s) > 0)
+  const comCusto = ativos.filter((s) => !s.e_resumo && custoAtual(s) > 0)
   const totalOrcado = comCusto.reduce((t, s) => t + custoAtual(s), 0)
   const alternar = (k) => setChaves({ ...chaves, [k]: !chaves[k] })
 
   async function salvarCustos() {
-    const r = custosAlterados(data.servicos, digitados)
+    const r = custosAlterados(ativos, digitados)
     if (r.erro) { aviso(r.erro); return }
     setOcupado(true)
     const g = r.linhas.length ? await dados.salvarCustos(r.linhas) : { erro: null }
@@ -71,7 +74,7 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
     if (g.erro) { aviso(g.erro); return }
     setEditando(false)
     setDigitados({})
-    aviso(`Custos salvos · ${comCusto.length} de ${data.servicos.filter((s) => !s.e_resumo).length} serviços com custo`)
+    aviso(`Custos salvos · ${comCusto.length} de ${ativos.filter((s) => !s.e_resumo).length} serviços com custo`)
     recarregar()
   }
 
@@ -81,7 +84,7 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
     setOcupado(false)
     if (r.erro) { aviso(r.erro); return }
     if (r.data.problemas) { setProblemas(r.data.problemas); return }
-    setCalculadoEm(new Date().toISOString())
+    setCalculadoEm(dados.agora())
     aviso(`Cronograma recalculado: ${r.data.criticos} críticos, ${r.data.atrasados} atrasados`)
     recarregar()
   }
@@ -94,6 +97,7 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
         <button className="chave" aria-pressed={chaves.criticos} onClick={() => alternar('criticos')}>Só críticos</button>
         <button className="chave" aria-pressed={chaves.atrasados} onClick={() => alternar('atrasados')}>Só atrasados</button>
         {verCusto && <button className="chave" aria-pressed={chaves.semCusto} onClick={() => alternar('semCusto')}>Só sem custo</button>}
+        {data.servicos.some((s) => s.cancelado) && <button className="chave" aria-pressed={chaves.cancelados} onClick={() => alternar('cancelados')}>Mostrar cancelados</button>}
       </div>
       {gestao && (
         <div className="filtros">
@@ -104,7 +108,7 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
           {verCusto && (
             <span className="caixa-num" style={{ padding: '4px 12px' }}>
               <b className="num" style={{ fontSize: 22 }}>{moeda(totalOrcado)}</b>
-              <span className="lab">Orçado<br />{comCusto.length} de {data.servicos.filter((s) => !s.e_resumo).length} com custo</span>
+              <span className="lab">Orçado<br />{comCusto.length} de {ativos.filter((s) => !s.e_resumo).length} com custo</span>
             </span>
           )}
           <span className="lab" style={{ marginLeft: 'auto' }}>{calculadoEm ? `Calculado em ${dataHoraBr(calculadoEm)}` : 'Caminho crítico ainda não calculado'}</span>
@@ -136,7 +140,7 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
               const atraso = diasAtraso(s, dia)
               const semCusto = !(Number(s.custo_orcado) > 0)
               return (
-                <tr key={s.id} className="clicavel" tabIndex={editando ? undefined : 0}
+                <tr key={s.id} className={`clicavel ${s.cancelado ? 'cancelado' : ''}`} tabIndex={editando ? undefined : 0}
                   onClick={() => !editando && goto('servico', { id: s.id })}
                   onKeyDown={(e) => { if (!editando && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); goto('servico', { id: s.id }) } }}>
                   <td className="num">{s.codigo_eap}</td>
@@ -149,7 +153,7 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
                   <td className="dir num so-largo">{numero(s.quantidade_executada, s.unidade === '%' ? 1 : 0)} / {numero(s.quantidade_prevista)} {s.unidade}</td>
                   {verCusto && (
                     <td className="dir num so-largo" onClick={(e) => editando && e.stopPropagation()}>
-                      {editando ? (
+                      {editando && !s.cancelado ? (
                         <input className="ipt" style={{ minHeight: 40, width: 150, textAlign: 'right' }} inputMode="decimal"
                           value={s.id in digitados ? digitados[s.id] : s.custo_orcado ?? ''} placeholder="R$" aria-label={`Custo de ${s.nome}`}
                           onChange={(e) => setDigitados({ ...digitados, [s.id]: e.target.value })} />
@@ -174,7 +178,7 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
       {visiveis.length === 0 && <p className="vazio-curto" style={{ textAlign: 'center' }}>Nenhum serviço com esse filtro.</p>}
       {editando && (
         <div className="salvar-barra">
-          <span className="lab num">{comCusto.length} de {data.servicos.filter((s) => !s.e_resumo).length} com custo · total {moeda(totalOrcado)}</span>
+          <span className="lab num">{comCusto.length} de {ativos.filter((s) => !s.e_resumo).length} com custo · total {moeda(totalOrcado)}</span>
           <button className="btn btn-quiet btn-lg" onClick={() => { setEditando(false); setDigitados({}) }}>Cancelar</button>
           <button className="btn btn-fill btn-lg" onClick={salvarCustos} disabled={ocupado}>{ocupado ? 'Salvando…' : 'Salvar custos'}</button>
         </div>

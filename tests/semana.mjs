@@ -50,12 +50,13 @@ const prods = [
   { servico_id: 22, data: '2026-10-12', quantidade: 70 }, { servico_id: 23, data: '2026-10-06', quantidade: 999 },    // depois / outro serviço
 ]
 conferir('total, acumulado anterior e acumulado até o fim da semana',
-  acumuladosDaSemana({ id: 22, quantidade_prevista: 3200 }, prods, seg), { total: 3200, anterior: 150.3, executado: 206.3 })
+  acumuladosDaSemana({ id: 22, quantidade_prevista: 206.3 * 4 }, prods, seg), { total: 825.2, anterior: 150.3, executado: 206.3, pct: 25 })
 
 // ── Ritmo ──
 const producoes = [
-  { servico_id: 22, data: '2026-09-29', quantidade: 62 }, { servico_id: 22, data: '2026-10-02', quantidade: 60 },
-  { servico_id: 22, data: '2026-09-22', quantidade: 60 }, { servico_id: 22, data: '2026-10-06', quantidade: 500 }, // semana atual não conta
+  { servico_id: 22, data: '2026-09-29', quantidade: 62, origem: 'PCP' }, { servico_id: 22, data: '2026-10-02', quantidade: 60, origem: 'PCP' },
+  { servico_id: 22, data: '2026-09-22', quantidade: 60, origem: 'PCP' }, { servico_id: 22, data: '2026-10-06', quantidade: 500, origem: 'PCP' }, // semana atual não conta
+  { servico_id: 22, data: '2026-09-23', quantidade: 900, origem: 'Ajuste' }, // ajuste de medição não é ritmo
   { servico_id: 23, data: '2026-09-30', quantidade: 999 },
 ]
 conferir('melhor ritmo = melhor média por dia trabalhado nas 4 semanas anteriores', melhorRitmo(producoes, 22, hoje), 61)

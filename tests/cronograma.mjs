@@ -1,5 +1,5 @@
 // Cronograma: caminho crítico, custos digitados, ajuste, troca de unidade e importação do Project.
-import { calcularCronograma, custosAlterados, validarAjuste, previaTrocaUnidade } from '../src/lib/cronograma.js'
+import { calcularCronograma, custosAlterados, validarCusto, validarAjuste, previaTrocaUnidade } from '../src/lib/cronograma.js'
 import { lerXmlDoProject, casarEtapas, compararImportacao, montarCarga } from '../src/lib/importacao.js'
 import { lerNumero } from '../src/lib/formato.js'
 
@@ -60,6 +60,10 @@ conferir('apagar o custo grava null', custosAlterados(servs, { 1: '' }), { linha
 conferir('custo inválido avisa o serviço', custosAlterados(servs, { 2: 'mil' }), { erro: 'Custo inválido em "Galeria".' })
 conferir('custo negativo é inválido', custosAlterados(servs, { 2: '-5' }).erro, 'Custo inválido em "Galeria".')
 
+conferir('custo: arredonda centavos', validarCusto('1.234,567'), { custo: 1234.57 })
+conferir('custo: vazio e zero = sem custo', [validarCusto(''), validarCusto('0')], [{ custo: null }, { custo: null }])
+conferir('custo: negativo é inválido', validarCusto('-1').erro, 'Custo inválido.')
+
 // Ajuste de produção
 const galeria = { id: 22, quantidade_executada: 100 }
 conferir('ajuste válido', validarAjuste({ quantidade: '-20', data: '2026-10-05', motivo: ' medição ' }, galeria, '2026-10-05'),
@@ -108,7 +112,7 @@ const atuais = [
 ]
 const cmp = compararImportacao(lido, atuais)
 conferir('novos: o resumo e o esgoto', cmp.novos.map((t) => t.uid), [1, 9])
-conferir('alterado: fim das galerias', cmp.alterados.map((a) => a.mudou), [[{ campo: 'fim', de: '2026-11-15', para: '2026-11-30' }]])
+conferir('alterado: fim das galerias', cmp.alterados.map((a) => a.mudou), [[{ campo: 'fim', de: '2026-11-15', para: '2026-11-30', data: true }]])
 conferir('cancelado: o que sumiu do Project', cmp.cancelados.map((s) => s.uid_project), [50])
 conferir('totais da prévia', cmp.totais, { tarefas: 4, servicos: 3, resumos: 1, ligacoes: 2 })
 conferir('não é a primeira importação', cmp.primeira, false)
