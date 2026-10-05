@@ -292,10 +292,6 @@ select.ipt { padding-right: 8px; }
 .tarefa-pe { display: flex; flex-direction: column; gap: 10px; margin: 10px 0 0 34px; }
 .tarefa .btn { width: 100%; min-height: 46px; font-size: 13px; padding: 0 10px; }
 .dia-vazio { padding: 16px 14px; color: var(--muted); }
-.motivo { display: grid; grid-template-columns: 190px 1fr 40px; gap: 14px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); font-size: 16px; }
-.sec-head + .motivo { border-top: 0; }
-.motivo .barra i { background: var(--red); }
-.motivo b { text-align: right; font-size: 20px; font-weight: 600; }
 
 /* ── Tabela (cronograma) ── */
 .tabela-wrap { background: var(--paper); border: 1px solid var(--line); overflow-x: auto; }
@@ -407,7 +403,6 @@ select.ipt { padding-right: 8px; }
   .dia.mostrar { display: block; }
   .dia:nth-child(n+4) { border-top: 0; }
   .dia h3 { display: none; }
-  .motivo { grid-template-columns: 130px 1fr 32px; }
   .grupo { padding: 4px 14px 6px; }
   .pessoa { grid-template-columns: 1fr; }
   .seg { grid-template-columns: repeat(4, 1fr); }
@@ -442,3 +437,51 @@ select.ipt { padding-right: 8px; }
   .grande { font-size: 50px; }
   .tri b { font-size: 26px; }
 }
+
+/* ── PCP: semana em tabela (igual ao cronograma) ── */
+.semana-tabela td { vertical-align: top; }
+.semana-tabela th.hoje, .semana-tabela td.hoje { background: var(--primary-tint); }
+.semana-tabela th.hoje { color: var(--primary); }
+.semana-tabela tr.atrasada td.nome { box-shadow: inset 4px 0 0 var(--red); }
+.cel-dia { min-width: 112px; }
+.semana-tabela th.acum-titulo { text-align: center; border-left: 2px solid var(--line-strong); }
+.semana-tabela .acum { border-left: 2px solid var(--line-strong); }
+.semana-tabela thead tr:last-child th { white-space: nowrap; }
+.cel-ativ { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 6px 8px; margin-bottom: 4px; border: 1px solid var(--line); border-left: 4px solid var(--line-strong); background: var(--paper); text-align: left; }
+.cel-ativ.ok { border-left-color: var(--green); }
+.cel-ativ.crit { border-left-color: var(--red); }
+.cel-ativ:not(:disabled):hover { border-color: var(--primary); }
+.cel-ativ:disabled { cursor: default; }
+.cel-ativ b { font-size: 18px; font-weight: 600; line-height: 1.1; }
+.cel-ativ span { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.cel-mais { width: 100%; min-height: 40px; border: 1px dashed var(--line); color: var(--muted); font-size: 20px; }
+.cel-mais:hover { border-color: var(--primary); color: var(--primary); }
+
+/* Conferência antes do primeiro dia de um serviço */
+.conferencia { border: 1px solid var(--amber); border-left: 6px solid var(--amber); padding: 10px 12px; margin: 4px 0 16px; background: var(--paper); }
+.conf-linha { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 15px; }
+.conf-linha .chave { min-height: 38px; }
+
+/* Pizza dos motivos (grupos macro) */
+.pizzas { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+.pizza-corpo { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 10px; }
+.pizza-legenda { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 150px; }
+.pizza-legenda li { display: flex; align-items: center; gap: 8px; padding: 5px 4px; cursor: pointer; font-size: 15px; }
+.pizza-legenda li.ativa { background: var(--primary-tint); }
+.pizza-legenda i { width: 12px; height: 12px; flex: none; }
+.pizza-legenda span { flex: 1; }
+.pizza-detalhe { min-height: 74px; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); background: var(--bg); font-size: 15px; display: flex; flex-direction: column; gap: 2px; }
+.opcoes.grupos button[aria-pressed='true'] { background: var(--primary); }
+
+/* ── 3 meses em tabela (13 semanas) ── */
+.cel-semana { min-width: 34px; padding: 10px 2px !important; }
+.cel-semana i { display: block; height: 14px; }
+.cel-semana i.ativo { background: var(--primary); }
+.cel-semana i.ativo.crit { background: var(--red); }
+.cel-semana i.ativo.feito { background: var(--green); }
+.tres-tabela th.hoje, .tres-tabela td.hoje { background: var(--primary-tint); }
+.tres-tabela tr.atrasada td.nome { box-shadow: inset 4px 0 0 var(--red); }
+
+/* Lista com caixa de marcar (puxar do plano de 3 meses) */
+.marcar { cursor: pointer; }
+.marcar input { width: 22px; height: 22px; flex: none; accent-color: var(--primary); }

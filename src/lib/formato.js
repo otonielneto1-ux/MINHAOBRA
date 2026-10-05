@@ -35,3 +35,16 @@ export function pontos(v) {
   const s = v < 0 ? '−' : '+'
   return `${s}${numero(Math.abs(v), 1)} p.p.`
 }
+
+// O contrário: número digitado por gente → Number. "85.000,50", "85000,5", "85000.5", "−12".
+// Ponto seguido de exatamente 3 dígitos é separador de milhar (jeito brasileiro).
+// Vazio → null; texto que não é número → NaN.
+export function lerNumero(texto) {
+  if (texto === null || texto === undefined) return null
+  let t = String(texto).trim().replace(/\s|R\$/g, '').replace('−', '-')
+  if (t === '') return null
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.')
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '')
+  const n = Number(t)
+  return Number.isFinite(n) ? n : NaN
+}

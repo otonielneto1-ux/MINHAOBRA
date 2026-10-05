@@ -1,13 +1,16 @@
 // Detalhe do serviço: números, predecessoras, produção, motivos, pacotes e restrições.
 
+import { useState } from 'react'
 import { useObra } from '../lib/ObraContext.jsx'
 import * as dados from '../lib/dados.js'
 import { pode } from '../lib/permissoes.js'
 import { avancoServico, diasAtraso } from '../lib/avanco.js'
 import { contarMotivos } from '../lib/pcp.js'
+import { previaTrocaUnidade, validarAjuste } from '../lib/cronograma.js'
+import { UNIDADES } from '../lib/vocabulario.js'
 import { dataBr } from '../lib/datas.js'
-import { moeda, porcento, quantidade } from '../lib/formato.js'
-import { Barra, Cabecalho, Carregando, ErroCaixa, Secao, Status, useAviso, useCarga } from '../components/index.jsx'
+import { lerNumero, moeda, porcento, quantidade } from '../lib/formato.js'
+import { Barra, Cabecalho, Carregando, ErroCaixa, Folha, Secao, Status, useAviso, useCarga } from '../components/index.jsx'
 
 async function carregar(id) {
   const r = await Promise.all([
@@ -25,6 +28,7 @@ export default function Servico({ goto, params, usuario }) {
   const aviso = useAviso()
   const dia = dados.hoje()
   const { data, erro, carregando, recarregar } = useCarga(() => carregar(params.id), [obra.id, params.id])
+  const [acao, setAcao] = useState(null)
 
   const voltar = { texto: 'Cronograma', acao: () => goto('planejamento', { aba: 'cronograma' }) }
   if (carregando && !data) return <Carregando />
@@ -43,8 +47,9 @@ export default function Servico({ goto, params, usuario }) {
       <Cabecalho voltar={voltar} rotulo={`${s.codigo_eap} · ${etapas.find((e) => e.id === s.etapa_entrega_id)?.nome} · ${s.local || 'sem local'}`} titulo={s.nome}
         acoes={gestao && (
           <>
-            <button className="btn" onClick={() => aviso('Lançar ajuste chega na próxima etapa')}>Lançar ajuste</button>
-            {s.unidade === '%' && <button className="btn btn-quiet" onClick={() => aviso('Trocar % por quantidade chega na próxima etapa')}>Trocar % por quantidade</button>}
+            <button className="btn" onClick={() => setAcao('ajuste')}>Lançar ajuste</button>
+            <button className="btn btn-quiet" onClick={() => setAcao('editar')}>{pode(usuario.role, 'verCusto') ? 'Editar custo e local' : 'Editar local'}</button>
+            {s.unidade === '%' && <button className="btn btn-quiet" onClick={() => setAcao('unidade')}>Trocar % por quantidade</button>}
           </>
         )} />
 
@@ -126,6 +131,127 @@ export default function Servico({ goto, params, usuario }) {
           </Secao>
         </div>
       </div>
+
+      <FolhaAcao acao={acao} servico={s} verCusto={pode(usuario.role, 'verCusto')} dia={dia} fechar={() => setAcao(null)}
+        salvo={(msg) => { setAcao(null); aviso(msg); recarregar() }} />
     </>
+  )
+}
+
+const TITULOS = { ajuste: 'Lançar ajuste', editar: 'Editar serviço', unidade: 'Trocar % por quantidade' }
+
+// Ações do Engenheiro e do Coordenador no serviço. acao: 'ajuste' | 'editar' | 'unidade'.
+function FolhaAcao({ acao, servico: s, verCusto, dia, fechar, salvo }) {
+  const [campos, setCampos] = useState({})
+  const [erro, setErro] = useState(null)
+  const [salvando, setSalvando] = useState(false)
+  const [abertaPara, setAbertaPara] = useState(null)
+
+  if (acao && abertaPara !== acao) {
+    setAbertaPara(acao)
+    setCampos({ quantidade: '', data: dia, motivo: '', custo: s.custo_orcado ?? '', local: s.local ?? '', unidade: 'm' })
+    setErro(null)
+  }
+  if (!acao && abertaPara !== null) setAbertaPara(null)
+
+  const mudar = (k, v) => { setCampos((c) => ({ ...c, [k]: v })); setErro(null) }
+  const previa = acao === 'unidade' ? previaTrocaUnidade(s, campos.unidade, campos.quantidade) : null
+
+  async function salvar() {
+    let r
+    if (acao === 'ajuste') {
+      const v = validarAjuste(campos, s, dia)
+      if (v.erro) { setErro(v.erro); return }
+      r = () => dados.lancarAjuste(v.registro)
+    } else if (acao === 'editar') {
+      const custo = lerNumero(campos.custo)
+      if (verCusto && (Number.isNaN(custo) || custo < 0)) { setErro('Custo inválido.'); return }
+      r = () => dados.editarServico(s.id, verCusto ? { custo_orcado: custo || null, local: campos.local } : { local: campos.local })
+    } else {
+      if (previa.erro) { setErro(previa.erro); return }
+      r = () => dados.trocarUnidade(s.id, campos.unidade, previa.prevista)
+    }
+    setSalvando(true)
+    const g = await r()
+    setSalvando(false)
+    if (g.erro) { setErro(g.erro); return }
+    salvo(acao === 'ajuste' ? 'Ajuste lançado' : acao === 'editar' ? 'Serviço salvo' : `Serviço agora medido em ${campos.unidade}`)
+  }
+
+  return (
+    <Folha aberta={!!acao} fechar={fechar} rotulo={TITULOS[acao] || 'Serviço'}>
+      {acao && (
+        <>
+          <div className="lab">{TITULOS[acao]}</div>
+          <h2>{s.nome}</h2>
+          <div className="sub">Executado {quantidade(s.quantidade_executada, s.unidade)} de {quantidade(s.quantidade_prevista, s.unidade)}</div>
+
+          {acao === 'ajuste' && (
+            <>
+              <div className="campo">
+                <label className="lab" htmlFor="qtd-ajuste">Quantidade (use − para tirar)</label>
+                <div className="qtd-ipt">
+                  <input id="qtd-ajuste" inputMode="decimal" value={campos.quantidade} onChange={(e) => mudar('quantidade', e.target.value)} />
+                  <span>{s.unidade}</span>
+                </div>
+              </div>
+              <div className="campo">
+                <label className="lab" htmlFor="data-ajuste">Data</label>
+                <input id="data-ajuste" type="date" className="ipt" max={dia} value={campos.data} onChange={(e) => mudar('data', e.target.value)} />
+              </div>
+              <div className="campo">
+                <label className="lab" htmlFor="motivo-ajuste">Motivo</label>
+                <input id="motivo-ajuste" className="ipt" value={campos.motivo} onChange={(e) => mudar('motivo', e.target.value)} placeholder="Ex.: medição de campo" />
+              </div>
+            </>
+          )}
+
+          {acao === 'editar' && (
+            <>
+              {verCusto && (
+                <div className="campo">
+                  <label className="lab" htmlFor="custo-servico">Custo orçado (R$)</label>
+                  <input id="custo-servico" className="ipt" inputMode="decimal" value={campos.custo} onChange={(e) => mudar('custo', e.target.value)} placeholder="Vazio = sem custo" />
+                </div>
+              )}
+              <div className="campo">
+                <label className="lab" htmlFor="local-servico">Local</label>
+                <input id="local-servico" className="ipt" value={campos.local} onChange={(e) => mudar('local', e.target.value)} placeholder="Rua, quadra ou trecho" />
+              </div>
+            </>
+          )}
+
+          {acao === 'unidade' && (
+            <>
+              <div className="campo">
+                <label className="lab" htmlFor="unidade-nova">Unidade</label>
+                <select id="unidade-nova" className="ipt" value={campos.unidade} onChange={(e) => mudar('unidade', e.target.value)}>
+                  {UNIDADES.filter((u) => u !== '%').map((u) => <option key={u}>{u}</option>)}
+                </select>
+              </div>
+              <div className="campo">
+                <label className="lab" htmlFor="prevista-nova">Quantidade prevista</label>
+                <div className="qtd-ipt">
+                  <input id="prevista-nova" inputMode="decimal" value={campos.quantidade} onChange={(e) => mudar('quantidade', e.target.value)} />
+                  <span>{campos.unidade}</span>
+                </div>
+              </div>
+              {!previa.erro && (
+                <p className="aviso" style={{ marginBottom: 16 }}>
+                  Executado hoje: {quantidade(s.quantidade_executada, '%')} → {quantidade(previa.executada, campos.unidade)} de {quantidade(previa.prevista, campos.unidade)}.
+                  Atividades do PCP, pacotes e ajustes deste serviço serão convertidos. Não tem volta automática.
+                </p>
+              )}
+            </>
+          )}
+
+          {erro && <p className="erro-campo" role="alert" style={{ marginBottom: 12 }}>{erro}</p>}
+          <div className="folha-acoes">
+            <button className="btn btn-quiet btn-lg" onClick={fechar}>Cancelar</button>
+            <button className="btn btn-fill btn-lg" onClick={salvar} disabled={salvando}>{salvando ? 'Salvando…' : acao === 'unidade' ? 'Converter' : 'Salvar'}</button>
+          </div>
+        </>
+      )}
+    </Folha>
   )
 }

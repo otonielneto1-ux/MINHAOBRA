@@ -23,7 +23,7 @@ export default function Planejamento({ goto, params, usuario }) {
       {/* Para o Técnico de Segurança, o Planejamento é a tela inicial: a capa aparece aqui. */}
       {telaInicial(usuario.role) === 'planejamento' && aba === 'semana' && <Capa />}
       <Abas abas={abas} atual={aba} trocar={(id) => goto('planejamento', { aba: id })} />
-      {aba === 'semana' && <Semana goto={goto} usuario={usuario} />}
+      {aba === 'semana' && <Semana key={params.semana || ''} goto={goto} usuario={usuario} params={params} />}
       {aba === 'tresMeses' && <TresMeses goto={goto} usuario={usuario} />}
       {aba === 'cronograma' && <Cronograma goto={goto} usuario={usuario} soSemCusto={!!params.semCusto} />}
     </>

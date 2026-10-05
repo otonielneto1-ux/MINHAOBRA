@@ -207,6 +207,64 @@ export function CurvaS({ pontos, altura = 150 }) {
   )
 }
 
+// ── Pizza: fatias com o detalhe ao passar o mouse (ou tocar, no celular) ──
+// fatias: [{ rotulo, valor, cor, detalhe: ['Chuva · 2', ...] }]
+export function Pizza({ titulo, fatias, vazio }) {
+  const [ativa, setAtiva] = useState(null)
+  const total = fatias.reduce((t, f) => t + f.valor, 0)
+  const pct = (v) => `${Math.round((v / total) * 100)}%`
+  const R = 80
+  const C = 90
+  const ponto = (a) => `${(C + R * Math.cos(a)).toFixed(2)},${(C + R * Math.sin(a)).toFixed(2)}`
+  // Ângulo onde cada fatia começa e termina (a primeira começa no topo).
+  const limites = fatias.reduce((l, f) => [...l, l[l.length - 1] + (f.valor / total) * 2 * Math.PI], [-Math.PI / 2])
+  const caminhos = fatias.map((_, i) => {
+    const [a0, a1] = [limites[i], limites[i + 1]]
+    return `M${C},${C} L${ponto(a0)} A${R},${R} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${ponto(a1)} Z`
+  })
+  const sel = ativa === null ? null : fatias[ativa]
+  const eventos = (i) => ({
+    onMouseEnter: () => setAtiva(i), onMouseLeave: () => setAtiva(null), onClick: () => setAtiva(ativa === i ? null : i),
+  })
+
+  return (
+    <div className="pizza">
+      <div className="lab lab-ink">{titulo}</div>
+      {total === 0 ? <p className="vazio-curto">{vazio}</p> : (
+        <>
+          <div className="pizza-corpo">
+            <svg viewBox="0 0 180 180" width="180" height="180" role="img"
+              aria-label={`${titulo}: ${fatias.map((f) => `${f.rotulo} ${pct(f.valor)}`).join(', ')}`}>
+              {fatias.map((f, i) => {
+                const props = { fill: f.cor, stroke: '#fff', strokeWidth: 2, opacity: ativa === null || ativa === i ? 1 : 0.4, style: { cursor: 'pointer' }, ...eventos(i) }
+                const dica = <title>{`${f.rotulo} · ${f.valor} (${pct(f.valor)})\n${f.detalhe.join('\n')}`}</title>
+                return fatias.length === 1
+                  ? <circle key={f.rotulo} cx={C} cy={C} r={R} {...props}>{dica}</circle>
+                  : <path key={f.rotulo} d={caminhos[i]} {...props}>{dica}</path>
+              })}
+            </svg>
+            <ul className="pizza-legenda">
+              {fatias.map((f, i) => (
+                <li key={f.rotulo} className={ativa === i ? 'ativa' : ''} {...eventos(i)}>
+                  <i style={{ background: f.cor }} /><span>{f.rotulo}</span><b className="num">{pct(f.valor)}</b>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="pizza-detalhe" aria-live="polite">
+            {sel ? (
+              <>
+                <b>{sel.rotulo} · {sel.valor} {sel.valor === 1 ? 'vez' : 'vezes'} ({pct(sel.valor)})</b>
+                {sel.detalhe.map((d) => <div key={d}>{d}</div>)}
+              </>
+            ) : <span className="meta">Passe o mouse (ou toque) numa fatia para ver as causas.</span>}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function Abas({ abas, atual, trocar }) {
   return (
     <div className="abas" role="tablist">

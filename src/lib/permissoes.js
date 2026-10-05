@@ -15,6 +15,7 @@ const MATRIZ = {
   editarPlanejamento: GESTAO,
   importarCronograma: GESTAO,
   lancarAjuste: GESTAO,
+  verProducao: [...GESTAO, MESTRE],
   darBaixa: [...GESTAO, MESTRE],
   verPacotes: [...GESTAO, MESTRE],
   gerirPacotes: GESTAO,

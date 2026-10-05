@@ -145,9 +145,10 @@ Não se aplica.
 
 **O que aparece**
 1. Seletor de semana: "◀ 05/10 a 10/10/2026 ▶" e o PPC da semana (ex.: "PPC 75% · 3 de 4").
-2. Computador: 6 colunas (segunda a sábado) com cartões. Celular: abas de dia (Seg, Ter, Qua, Qui, Sex, Sáb), um dia por vez, abrindo no dia de hoje.
-3. Cada cartão: serviço, local, quantidade planejada, equipe, pacote (se houver), etiqueta de status (Planejada cinza, Concluída verde, Não concluída vermelha), quantidade executada e motivo quando houver baixa.
-4. Abaixo (computador) ou em botão "Ver motivos" (celular): gráfico de barras dos motivos de não conclusão nas últimas 8 semanas, e o PPC de cada uma dessas semanas.
+2. Computador: **igual ao cronograma**, em tabela — uma linha por serviço previsto na semana pelo cronograma, mais os **atrasados que ainda não terminaram (no topo, em vermelho, com os dias de atraso)**; uma coluna por dia (segunda a sábado). Cada célula mostra a atividade do dia (quantidade, equipe, status pela cor; motivo quando houver). Célula vazia (de hoje em diante) tem "+" para criar a atividade daquele serviço naquele dia. Colunas **Produção média /dia**: **Cronograma** (ritmo da linha de base: quantidade ÷ dias de trabalho previstos) e **Precisa** (o que falta ÷ dias de trabalho de hoje até o fim previsto), com **⚠ irreal** quando passar de 1,5× o melhor ritmo do serviço e "prazo vencido" quando o fim previsto já passou. Semana que já passou mostra só os serviços que tiveram atividade. Última coluna, dividida em três: **Total** (quantidade prevista do serviço), **Acumulado anterior** (executado até antes da semana) e **Acumulado executado** (até o fim da semana, com %); o Técnico de Segurança vê só o total.
+   Celular: abas de dia (Seg, Ter, Qua, Qui, Sex, Sáb), um dia por vez, abrindo no dia de hoje, em cartões (com "Serviço atrasado" quando for o caso).
+3. Cada atividade: serviço, local, quantidade programada para o dia, equipe, pacote (se houver), status (Planejada cinza, Concluída verde, Não concluída vermelha), quantidade executada e motivo quando houver baixa.
+4. Abaixo (computador) ou em botão "Ver motivos" (celular): **dois gráficos de pizza — mês atual e mês anterior —** com os motivos de não atingir a meta do dia agrupados nos 7 grupos macro. Ao passar o mouse (ou tocar) numa fatia, aparecem as causas daquele grupo e quantas vezes cada uma.
 
 **Campos da atividade (criar/editar)**
 
@@ -165,13 +166,16 @@ Não se aplica.
 | Campo | Tipo | Obrigatório | Observação |
 |---|---|---|---|
 | Quantidade executada | número | sim | começa com a planejada preenchida; mesma unidade do serviço (% ou m, m², m³, kg, t, un) |
-| Motivo | escolha | quando executada < planejada | Chuva, Falta de material, Falta de equipe, Projeto, Equipamento, Frente não liberada, Outro |
+| Equipe | texto | sim | qual equipe fez; começa com a equipe planejada |
+| Motivo | escolha em dois passos (grupo, depois causa) | quando executada < programado do dia | Condição climática (Chuva, Solo encharcado, Vento ou calor excessivo) · Execução (Falta de equipe, Baixa produtividade, Retrabalho) · Planejamento (Frente não liberada, Meta acima da capacidade, Interferência de outra equipe, Mudança de prioridade) · Projetos (Falta de projeto, Dúvida ou erro de projeto) · Suprimentos (Falta de material, Atraso na entrega de material, Equipamento (falta ou quebra)) · Segurança (Acidente ou incidente, Paralisação por segurança, Falta de EPI) · Outros (Outro) |
 
 **Ações**
 - **Nova atividade:** formulário acima; ao salvar o cartão aparece no dia sem recarregar.
-- **Puxar do plano de 3 meses:** lista os serviços previstos para a semana; marcar vários cria atividades com local e quantidade sugeridos.
+- **Distribuir na semana:** para cada serviço previsto ou atrasado, reparte **o que falta de forma igual pelos dias de trabalho (seg–sáb) até o fim previsto** — recupera o atraso sem mudar o prazo final — e cria uma atividade por dia livre desta semana (de hoje em diante; se o fim previsto já passou, o que falta tem de caber nesta semana). **Alerta de ritmo irreal** quando a média diária necessária passa de 1,5× o melhor ritmo do serviço (melhor média por dia trabalhado nas 4 semanas anteriores; sem histórico, o ritmo planejado da linha de base). Serviço sem local entra como "A definir".
+- **Pode antecipar:** lista os serviços que começam nas próximas 4 semanas, não têm restrição pendente e cujas predecessoras já deixam começar (término-início: terminou; início-início: começou). Botão **Antecipar** abre a distribuição com o serviço marcado.
+- **Conferência de início (bloqueia):** ao planejar a primeira atividade de um serviço que ainda não começou (na Nova atividade ou na distribuição), quatro perguntas — Material está em obra? Ferramentas e equipamentos estão em obra? Mão de obra já está dimensionada? Projeto está sem dúvidas? A atividade só é criada com as quatro "sim"; com um "não", o aviso manda registrar a pendência como restrição no plano de 3 meses.
 - **Copiar pendentes para a próxima semana:** cria na semana seguinte uma cópia de cada atividade Não concluída (quantidade = planejada − executada).
-- **Dar baixa:** janela com quantidade executada e motivo. Ao salvar: executada ≥ planejada → Concluída; menor → Não concluída. A etiqueta muda na hora e o PPC é recalculado.
+- **Dar baixa:** janela com quantidade executada, equipe e motivo. Ao salvar: executada ≥ planejada → Concluída; menor → Não concluída. A etiqueta muda na hora e o PPC é recalculado.
 - **Desfazer baixa:** volta para Planejada.
 - **Editar / Excluir atividade:** só enquanto Planejada.
 
@@ -181,7 +185,7 @@ Não se aplica.
 - Técnico de Segurança: só leitura (sem botões).
 
 **Estado vazio**
-"Semana sem atividades planejadas." (Engenheiro/Coordenador veem também o botão Puxar do plano de 3 meses.)
+"Semana sem atividades planejadas." (Engenheiro/Coordenador veem também o botão Distribuir na semana.)
 
 ---
 
@@ -192,8 +196,8 @@ Não se aplica.
 
 **O que aparece**
 1. Filtro: etapa de entrega; chave "Só com restrição pendente".
-2. Lista agrupada por semana (próximas 13 semanas, a partir da atual): "Semana 12/10 a 17/10".
-3. Em cada semana, os serviços que começam ou continuam nela: nome, local, etapa de entrega, % executado, etiqueta Crítico (vermelha) se for o caso, contagem de restrições pendentes ("2 restrições").
+2. Computador: **tabela igual ao cronograma**, com as próximas 13 semanas como colunas (a atual destacada): EAP, serviço (local, etapa, Atrasado/Crítico), % executado, uma barra em cada semana em que o serviço está previsto (vermelha se crítico ou atrasado) e restrições pendentes. Atrasados que ainda não terminaram ficam no topo, ativos na semana atual.
+3. Celular: lista agrupada por semana ("Semana 12/10 a 17/10"), com nome, local, etapa, % executado, Crítico e contagem de restrições pendentes.
 4. Ao abrir um serviço: suas restrições com tipo, descrição, responsável, data limite e status; vencidas em vermelho.
 
 **Campos da restrição**

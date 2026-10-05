@@ -9,6 +9,7 @@ import { supabase } from './supabase.js'
 import { paraIso, mesesEntre } from './datas.js'
 import { pode } from './permissoes.js'
 import { resultadoBaixa } from './pcp.js'
+import { calcularCronograma } from './cronograma.js'
 import { resumoAvanco, curvaS } from './avanco.js'
 import { servicosAtrasados } from './alertas.js'
 import { tipoDeImagemValido } from './imagem.js'
@@ -130,6 +131,53 @@ export function listarProducoes({ servicoId } = {}) {
 
 export const listarRestricoes = () => q(supabase.from('restricoes').select('*').eq('obra_id', obraAtualId))
 
+// ── Cronograma: edição (Engenheiro e Coordenador) ────────────────────────
+const recusa = (acao, msg) => (pode(role(), acao) ? null : Promise.resolve(falha(msg)))
+
+// carga: montarCarga() de lib/importacao.js. Grava tudo de uma vez (função importar_cronograma).
+export const importarCronograma = (carga) => recusa('importarCronograma', 'Seu perfil não importa cronograma.')
+  ?? q(supabase.rpc('importar_cronograma', { p_obra: obraAtualId, p_tarefas: carga.tarefas, p_ligacoes: carga.ligacoes }))
+
+// Recalcula caminho crítico, folga e atrasos (lib/cronograma.js) e grava.
+// Com problema (ciclo, serviço sem data), nada é gravado: devolve { problemas } para a tela listar.
+export async function recalcularCronograma() {
+  if (!pode(role(), 'importarCronograma')) return falha('Seu perfil não recalcula o cronograma.')
+  const [s, d] = await Promise.all([listarServicos(), listarDependencias()])
+  if (s.erro || d.erro) return falha(s.erro || d.erro)
+  const r = calcularCronograma(s.data, d.data, hoje())
+  if (r.problemas) return { data: r, erro: null }
+  const g = await q(supabase.rpc('gravar_calculo', { p_obra: obraAtualId, p_linhas: r.linhas }))
+  return g.erro ? g : { data: r, erro: null }
+}
+
+// linhas: custosAlterados() de lib/cronograma.js.
+export const salvarCustos = (linhas) => recusa('verCusto', 'Seu perfil não edita custos.')
+  ?? q(supabase.rpc('salvar_custos', { p_obra: obraAtualId, p_linhas: linhas }))
+
+// Custo orçado e/ou local, no detalhe do serviço (campo ausente não muda).
+export function editarServico(id, { custo_orcado, local }) {
+  if (!pode(role(), 'editarPlanejamento')) return Promise.resolve(falha('Seu perfil não edita serviços.'))
+  const campos = {}
+  if (custo_orcado !== undefined) campos.custo_orcado = custo_orcado
+  if (local !== undefined) campos.local = local.trim() || null
+  return q(supabase.from('servicos').update(campos).eq('id', id).eq('obra_id', obraAtualId))
+}
+
+// registro: validarAjuste() de lib/cronograma.js.
+export const lancarAjuste = (registro) => recusa('lancarAjuste', 'Seu perfil não lança ajuste.')
+  ?? q(supabase.from('producoes').insert({ ...registro, obra_id: obraAtualId, origem: 'Ajuste', lancado_por: usuarioAtual.id }))
+
+export const trocarUnidade = (servicoId, unidade, quantidade) => recusa('lancarAjuste', 'Seu perfil não troca a unidade.')
+  ?? q(supabase.rpc('trocar_unidade', { p_servico: servicoId, p_unidade: unidade, p_quantidade: quantidade }))
+
+// ── Restrições (plano de 3 meses) ────────────────────────────────────────
+// registro: validarRestricao() / validarRemocao() de lib/pcp.js.
+export const criarRestricao = (servicoId, registro) => recusa('editarPlanejamento', 'Seu perfil não cria restrição.')
+  ?? q(supabase.from('restricoes').insert({ ...registro, obra_id: obraAtualId, servico_id: servicoId }))
+
+export const editarRestricao = (id, registro) => recusa('editarPlanejamento', 'Seu perfil não edita restrição.')
+  ?? q(supabase.from('restricoes').update(registro).eq('id', id).eq('obra_id', obraAtualId))
+
 // Avanço da obra só em percentuais (tela do Cliente). Quem não vê custo pondera pelo peso
 // relativo que o banco calcula; Engenheiro e Coordenador, pelo custo.
 export async function avancoDaObra() {
@@ -166,17 +214,35 @@ export function listarAtividades({ de, ate } = {}) {
 }
 
 // A regra da baixa roda aqui (mensagem rápida) e de novo no banco (dar_baixa), que grava a produção.
-export async function darBaixa(atividadeId, { executada, motivo }) {
+export async function darBaixa(atividadeId, { executada, motivo, equipe }) {
   if (!pode(role(), 'darBaixa')) return falha('Seu perfil não dá baixa.')
   const { data: a } = await q(supabase.from('pcp_atividades').select('quantidade_planejada').eq('id', atividadeId).single())
   if (a) {
-    const r = resultadoBaixa(a.quantidade_planejada, executada, motivo)
+    const r = resultadoBaixa(a.quantidade_planejada, executada, motivo, equipe)
     if (r.erro) return falha(r.erro)
   }
-  return q(supabase.rpc('dar_baixa', { p_atividade: atividadeId, p_executada: Number(executada), p_motivo: motivo || null }))
+  return q(supabase.rpc('dar_baixa', { p_atividade: atividadeId, p_executada: Number(executada), p_motivo: motivo || null, p_equipe: equipe?.trim() || null }))
 }
 
 export const desfazerBaixa = (atividadeId) => q(supabase.rpc('desfazer_baixa', { p_atividade: atividadeId }))
+
+// Montar a semana (Engenheiro e Coordenador). registros: validarAtividade(), distribuirNaSemana()
+// ou copiarPendentes() de lib/pcp.js.
+export const criarAtividades = (registros) => recusa('editarPlanejamento', 'Seu perfil não planeja a semana.')
+  ?? q(supabase.from('pcp_atividades').insert(registros.map((r) => ({ ...r, obra_id: obraAtualId }))))
+
+// Editar e excluir só enquanto Planejada; sem linha alterada = já recebeu baixa.
+export async function editarAtividade(id, registro) {
+  if (!pode(role(), 'editarPlanejamento')) return falha('Seu perfil não planeja a semana.')
+  const r = await q(supabase.from('pcp_atividades').update(registro).eq('id', id).eq('obra_id', obraAtualId).eq('status', 'Planejada').select('id'))
+  return r.erro || r.data.length ? r : falha('Essa atividade já recebeu baixa e não pode ser editada.')
+}
+
+export async function excluirAtividade(id) {
+  if (!pode(role(), 'editarPlanejamento')) return falha('Seu perfil não planeja a semana.')
+  const r = await q(supabase.from('pcp_atividades').delete().eq('id', id).eq('obra_id', obraAtualId).eq('status', 'Planejada').select('id'))
+  return r.erro || r.data.length ? r : falha('Essa atividade já recebeu baixa e não pode ser excluída.')
+}
 
 // ── Pacotes ──────────────────────────────────────────────────────────────
 export const listarPacotes = () => (gestao()

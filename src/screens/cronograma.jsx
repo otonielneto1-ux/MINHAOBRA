@@ -5,9 +5,10 @@ import { useObra } from '../lib/ObraContext.jsx'
 import * as dados from '../lib/dados.js'
 import { pode } from '../lib/permissoes.js'
 import { avancoServico, diasAtraso } from '../lib/avanco.js'
-import { diasEntre, diaMes } from '../lib/datas.js'
-import { moeda, numero, porcento } from '../lib/formato.js'
-import { Carregando, ErroCaixa, Icone, Status, Vazio, useAviso, useCarga } from '../components/index.jsx'
+import { custosAlterados } from '../lib/cronograma.js'
+import { dataHoraBr, diasEntre } from '../lib/datas.js'
+import { lerNumero, moeda, numero, porcento } from '../lib/formato.js'
+import { Carregando, ErroCaixa, Folha, Icone, Status, Vazio, useAviso, useCarga } from '../components/index.jsx'
 
 async function carregar() {
   const r = await Promise.all([dados.listarServicos(), dados.listarEtapas()])
@@ -23,6 +24,10 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
   const [etapa, setEtapa] = useState(null)
   const [chaves, setChaves] = useState({ criticos: false, atrasados: false, semCusto: soSemCusto })
   const [editando, setEditando] = useState(false)
+  const [digitados, setDigitados] = useState({})
+  const [ocupado, setOcupado] = useState(false)
+  const [problemas, setProblemas] = useState(null)
+  const [calculadoEm, setCalculadoEm] = useState(obra.ultimo_calculo_em)
   const { data, erro, carregando, recarregar } = useCarga(carregar, [obra.id])
 
   if (carregando && !data) return <Carregando />
@@ -51,9 +56,35 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
   })
   const filtrando = chaves.criticos || chaves.atrasados || chaves.semCusto
   const visiveis = filtrando ? linhas.filter((s) => !s.e_resumo) : linhas
-  const comCusto = data.servicos.filter((s) => !s.e_resumo && Number(s.custo_orcado) > 0)
-  const totalOrcado = comCusto.reduce((t, s) => t + Number(s.custo_orcado), 0)
+  // No modo planilha, o rodapé soma o que está digitado (o que não foi tocado vale o salvo).
+  const custoAtual = (s) => (s.id in digitados ? lerNumero(digitados[s.id]) : Number(s.custo_orcado))
+  const comCusto = data.servicos.filter((s) => !s.e_resumo && custoAtual(s) > 0)
+  const totalOrcado = comCusto.reduce((t, s) => t + custoAtual(s), 0)
   const alternar = (k) => setChaves({ ...chaves, [k]: !chaves[k] })
+
+  async function salvarCustos() {
+    const r = custosAlterados(data.servicos, digitados)
+    if (r.erro) { aviso(r.erro); return }
+    setOcupado(true)
+    const g = r.linhas.length ? await dados.salvarCustos(r.linhas) : { erro: null }
+    setOcupado(false)
+    if (g.erro) { aviso(g.erro); return }
+    setEditando(false)
+    setDigitados({})
+    aviso(`Custos salvos · ${comCusto.length} de ${data.servicos.filter((s) => !s.e_resumo).length} serviços com custo`)
+    recarregar()
+  }
+
+  async function recalcular() {
+    setOcupado(true)
+    const r = await dados.recalcularCronograma()
+    setOcupado(false)
+    if (r.erro) { aviso(r.erro); return }
+    if (r.data.problemas) { setProblemas(r.data.problemas); return }
+    setCalculadoEm(new Date().toISOString())
+    aviso(`Cronograma recalculado: ${r.data.criticos} críticos, ${r.data.atrasados} atrasados`)
+    recarregar()
+  }
 
   return (
     <>
@@ -67,10 +98,16 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
       {gestao && (
         <div className="filtros">
           <button className="btn" onClick={() => goto('importar')}><Icone nome="arquivo" />Importar do Project</button>
-          <button className={`btn so-largo ${editando ? 'btn-fill' : ''}`} onClick={() => setEditando(!editando)}>{editando ? 'Parar de editar' : 'Editar custos'}</button>
+          {!editando && <button className="btn so-largo" onClick={() => setEditando(true)}>Editar custos</button>}
           <span className="meta so-curto">Custos: edite no computador</span>
-          <button className="btn btn-quiet" onClick={() => aviso('O recálculo do caminho crítico chega junto com a importação')}>Recalcular</button>
-          <span className="lab" style={{ marginLeft: 'auto' }}>Calculado em {diaMes(obra.ultimo_calculo_em.slice(0, 10))} {obra.ultimo_calculo_em.slice(11, 16)}</span>
+          <button className="btn btn-quiet" onClick={recalcular} disabled={ocupado || editando}>{ocupado && !editando ? 'Calculando…' : 'Recalcular'}</button>
+          {verCusto && (
+            <span className="caixa-num" style={{ padding: '4px 12px' }}>
+              <b className="num" style={{ fontSize: 22 }}>{moeda(totalOrcado)}</b>
+              <span className="lab">Orçado<br />{comCusto.length} de {data.servicos.filter((s) => !s.e_resumo).length} com custo</span>
+            </span>
+          )}
+          <span className="lab" style={{ marginLeft: 'auto' }}>{calculadoEm ? `Calculado em ${dataHoraBr(calculadoEm)}` : 'Caminho crítico ainda não calculado'}</span>
         </div>
       )}
 
@@ -114,7 +151,8 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
                     <td className="dir num so-largo" onClick={(e) => editando && e.stopPropagation()}>
                       {editando ? (
                         <input className="ipt" style={{ minHeight: 40, width: 150, textAlign: 'right' }} inputMode="decimal"
-                          defaultValue={s.custo_orcado ?? ''} placeholder="R$" aria-label={`Custo de ${s.nome}`} />
+                          value={s.id in digitados ? digitados[s.id] : s.custo_orcado ?? ''} placeholder="R$" aria-label={`Custo de ${s.nome}`}
+                          onChange={(e) => setDigitados({ ...digitados, [s.id]: e.target.value })} />
                       ) : semCusto ? <span className="falta">— sem custo</span> : moeda(s.custo_orcado)}
                     </td>
                   )}
@@ -137,9 +175,26 @@ export default function Cronograma({ goto, usuario, soSemCusto }) {
       {editando && (
         <div className="salvar-barra">
           <span className="lab num">{comCusto.length} de {data.servicos.filter((s) => !s.e_resumo).length} com custo · total {moeda(totalOrcado)}</span>
-          <button className="btn btn-fill btn-lg" onClick={() => { setEditando(false); aviso('Salvar custos chega na próxima etapa') }}>Salvar custos</button>
+          <button className="btn btn-quiet btn-lg" onClick={() => { setEditando(false); setDigitados({}) }}>Cancelar</button>
+          <button className="btn btn-fill btn-lg" onClick={salvarCustos} disabled={ocupado}>{ocupado ? 'Salvando…' : 'Salvar custos'}</button>
         </div>
       )}
+
+      <Folha aberta={!!problemas} fechar={() => setProblemas(null)} rotulo="Problemas no cronograma">
+        {problemas && (
+          <>
+            <div className="lab">Recalcular</div>
+            <h2>O cálculo não foi feito</h2>
+            <p className="sub">Corrija no MS Project e importe de novo. O cálculo anterior continua valendo.</p>
+            <div className="lista">
+              {problemas.map((p) => (
+                <div key={p.id} className="linha"><div className="linha-main"><div className="linha-titulo">{p.nome}</div><div className="meta crit">{p.motivo}</div></div></div>
+              ))}
+            </div>
+            <div className="folha-acoes" style={{ marginTop: 16 }}><button className="btn btn-quiet btn-lg" onClick={() => setProblemas(null)}>Fechar</button></div>
+          </>
+        )}
+      </Folha>
     </>
   )
 }

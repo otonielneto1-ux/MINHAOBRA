@@ -316,6 +316,7 @@ Maior que o normal para uma primeira versão (o guia é até 7). Foi mantido por
 
 - `[PENDENTE: digitar o custo orçado de cada serviço]` — até todos terem custo, o avanço da obra é ponderado por duração, não por custo. É trabalho de uma vez, na implantação.
 - `[PENDENTE: apropriação de custo no Sienge por serviço/EAP]` — sem isso, a Versão 2 não consegue dizer qual atividade custou mais que o previsto.
+- `[PENDENTE: trocar os dados de exemplo pelos reais da Costamare]` — decidido em 05/10/2026: o banco fica com os dados de exemplo enquanto os módulos mudam. Antes de carregar os reais, apagar os de exemplo (as pessoas de exemplo também), mantendo a conta do Otoniel como Engenheiro.
 - `[PENDENTE: armazenamento de fotos]` — o plano grátis do Supabase guarda 1 GB; as fotos são comprimidas no envio, mas com muito uso será preciso o plano pago (cerca de US$ 25/mês).
 
 # Decidir depois de usar
@@ -323,5 +324,7 @@ Maior que o normal para uma primeira versão (o guia é até 7). Foi mantido por
 - `[DESCOBRIR NO USO: dia de montar o PCP]` — por enquanto: a semana é montada até sexta para a semana seguinte.
 - `[DESCOBRIR NO USO: prazo para o mestre corrigir lançamentos]` — por enquanto: até o fim do dia seguinte.
 - `[DESCOBRIR NO USO: meta de PPC]` — por enquanto: 80% (verde na meta, âmbar até 20 pontos abaixo, vermelho abaixo disso).
+- `[DESCOBRIR NO USO: ritmo irreal]` — por enquanto: alerta quando a produção diária necessária passa de 1,5× o melhor ritmo do serviço nas últimas 4 semanas (sem histórico, o ritmo da linha de base).
+- `[DESCOBRIR NO USO: janela de antecipação]` — por enquanto: serviços que começam nas próximas 4 semanas.
 - `[DESCOBRIR NO USO: limites dos alertas]` — por enquanto: pacote a menos de 5 dias do fechamento abaixo de 70% da meta; ocorrência sem resposta há 48 h.
 - `[DESCOBRIR NO USO: divisão do prêmio]` — por enquanto: proporcional aos dias de presença, só funcionários próprios, só com 100% da meta.

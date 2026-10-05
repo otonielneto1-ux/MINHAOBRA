@@ -31,7 +31,7 @@
 | `presencas.situacao` | Presente, Falta, Atestado, Afastado |
 | `pacotes.status` | Planejado, Liberado, Em execução, Concluído, Não concluído |
 | `pcp_atividades.status` | Planejada, Concluída, Não concluída |
-| motivo de não conclusão (`pacotes`, `pcp_atividades`) | Chuva, Falta de material, Falta de equipe, Projeto, Equipamento, Frente não liberada, Outro |
+| motivo de não conclusão (`pacotes`, `pcp_atividades`) | a causa; o grupo macro sai dela (`GRUPOS_MOTIVO` em vocabulario.js): Condição climática (Chuva, Solo encharcado, Vento ou calor excessivo) · Execução (Falta de equipe, Baixa produtividade, Retrabalho) · Planejamento (Frente não liberada, Meta acima da capacidade, Interferência de outra equipe, Mudança de prioridade) · Projetos (Falta de projeto, Dúvida ou erro de projeto) · Suprimentos (Falta de material, Atraso na entrega de material, Equipamento (falta ou quebra)) · Segurança (Acidente ou incidente, Paralisação por segurança, Falta de EPI) · Outros (Outro) |
 | `producoes.origem` | PCP, Ajuste |
 | `ocorrencias.status` | Aberta, Em análise, Em tratamento, Resolvida, Recusada |
 
@@ -445,6 +445,7 @@ Permissão de linha não esconde coluna. Por isso:
 - **Gatilho:** fim de uma importação do Project; alteração em datas ou predecessoras; botão "Recalcular".
 - **Passos:**
   1. Ida pela rede (datas mais cedo) e volta (datas mais tarde), respeitando TI, II, TT, IT e a defasagem, em dias corridos.
+     Cada serviço começa no início previsto do Project ou depois, se uma predecessora empurrar (nunca antes). Ligações com tarefa-resumo ficam de fora.
   2. `folga_dias` = fim mais tarde − fim mais cedo; `critico` = folga ≤ 0.
   3. `dias_atraso` contra a linha de base: terminado → fim_real − fim_base (mínimo 0); não terminado e hoje > fim_base → hoje − fim_base; sem produção e hoje > inicio_base → hoje − inicio_base.
   4. Grava tudo de uma vez e atualiza `obras.ultimo_calculo_em`.

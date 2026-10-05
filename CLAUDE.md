@@ -52,6 +52,9 @@ testada simulando cada perfil — ver `supabase/migrations/20261005-02-acesso.sq
 - **Baixa do PCP passa pela função `dar_baixa`** (confere a regra e grava a produção). A mesma regra
   existe em `src/lib/pcp.js` para a mensagem rápida: mudou uma, mude a outra.
 - **Quantidade executada** de serviços e pacotes abertos é mantida por gatilho a partir de `producoes`.
+- **Caminho crítico** é calculado em `src/lib/cronograma.js` (com teste) e gravado de uma vez pela função
+  `gravar_calculo`. Importação do Project, custos em lote e troca de % por quantidade também são funções
+  do banco (`importar_cronograma`, `salvar_custos`, `trocar_unidade`): tudo ou nada, nunca metade.
 - **Conta nova nasce "Aguardando"** (gatilho `handle_new_user`). Papel e obra só mudam pela função
   `liberar_usuario` (Engenheiro) ou por SQL — nunca por update direto em `profiles` pelo navegador.
 - **Carga de exemplo:** `node scripts/gerar-seed.mjs` gera `supabase-seed.sql` a partir de

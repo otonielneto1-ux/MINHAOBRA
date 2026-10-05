@@ -16,9 +16,19 @@ export const UNIDADES = ['%', 'm', 'm²', 'm³', 'kg', 't', 'un']
 
 export const TIPOS_DEPENDENCIA = ['TI', 'II', 'TT', 'IT']
 
-export const MOTIVOS_NAO_CONCLUSAO = [
-  'Chuva', 'Falta de material', 'Falta de equipe', 'Projeto', 'Equipamento', 'Frente não liberada', 'Outro',
-]
+// Motivo de não atingir a meta do dia, em 7 grupos macro. O CHECK do banco tem as causas (os valores),
+// com o texto idêntico (supabase/migrations/20261005-07-motivos-por-grupo.sql).
+export const GRUPOS_MOTIVO = {
+  'Condição climática': ['Chuva', 'Solo encharcado', 'Vento ou calor excessivo'],
+  'Execução': ['Falta de equipe', 'Baixa produtividade', 'Retrabalho'],
+  'Planejamento': ['Frente não liberada', 'Meta acima da capacidade', 'Interferência de outra equipe', 'Mudança de prioridade'],
+  'Projetos': ['Falta de projeto', 'Dúvida ou erro de projeto'],
+  'Suprimentos': ['Falta de material', 'Atraso na entrega de material', 'Equipamento (falta ou quebra)'],
+  'Segurança': ['Acidente ou incidente', 'Paralisação por segurança', 'Falta de EPI'],
+  'Outros': ['Outro'],
+}
+
+export const MOTIVOS_NAO_CONCLUSAO = Object.values(GRUPOS_MOTIVO).flat()
 
 export const STATUS_PCP = { PLANEJADA: 'Planejada', CONCLUIDA: 'Concluída', NAO_CONCLUIDA: 'Não concluída' }
 
