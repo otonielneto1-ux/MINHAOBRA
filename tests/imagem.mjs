@@ -1,5 +1,5 @@
 // Imagens da capa: arquivo aceito, formato de saída, redução e iniciais.
-import { validarArquivoImagem, formatoDeSaida, medidasReduzidas, iniciais } from '../src/lib/imagem.js'
+import { validarArquivoImagem, formatoDeSaida, medidasReduzidas, iniciais, tipoDeImagemValido } from '../src/lib/imagem.js'
 
 let ok = 0
 let tot = 0
@@ -22,6 +22,10 @@ conferir('foto sempre vira JPEG', formatoDeSaida('foto', 'image/png'), 'image/jp
 conferir('foto grande deitada reduz pelo lado maior', medidasReduzidas(4000, 3000, 1200), { largura: 1200, altura: 900 })
 conferir('foto em pé reduz pela altura', medidasReduzidas(3000, 4000, 1200), { largura: 900, altura: 1200 })
 conferir('imagem pequena não aumenta', medidasReduzidas(500, 300, 1200), { largura: 500, altura: 300 })
+
+conferir('os 3 tipos da capa são aceitos', ['foto_obra', 'logo_cliente', 'logo_construtora'].map(tipoDeImagemValido), [true, true, true])
+conferir('nome interno do JavaScript não passa como tipo', tipoDeImagemValido('toString'), false)
+conferir('tipo inventado não passa', tipoDeImagemValido('foto_qualquer'), false)
 
 conferir('iniciais do cliente', iniciais('Conviver Urbanismo'), 'CU')
 conferir('iniciais da construtora', iniciais('Solutio Engenharia'), 'SE')

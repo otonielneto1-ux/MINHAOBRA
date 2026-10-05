@@ -11,6 +11,9 @@ export const IMAGENS_CAPA = {
   logo_construtora: { rotulo: 'Logo da construtora', maxLado: 600, formato: 'logo' },
 }
 
+// Só os 3 tipos da capa (Object.hasOwn: nomes internos como "toString" não passam).
+export const tipoDeImagemValido = (tipo) => Object.hasOwn(IMAGENS_CAPA, tipo)
+
 // Confere o arquivo escolhido antes de comprimir. Devolve null (ok) ou a mensagem de erro.
 export function validarArquivoImagem({ type, size }) {
   if (!TIPOS_IMAGEM.includes(type)) return 'Escolha uma imagem JPG, PNG ou WEBP.'

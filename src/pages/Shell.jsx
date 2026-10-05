@@ -5,7 +5,6 @@ import { useState } from 'react'
 import { useObra } from '../lib/ObraContext.jsx'
 import { hoje } from '../lib/dados.js'
 import { dataBr, nomeDia } from '../lib/datas.js'
-import { USAR_MOCK } from '../lib/config.js'
 import { divisaoCelular, menuDoPerfil, telaInicial } from '../lib/permissoes.js'
 import { Folha, Icone } from '../components/index.jsx'
 
@@ -93,8 +92,7 @@ export default function Shell({ usuario, sair }) {
           </div>
           <div className="top-right">
             <div className="status-line">
-              <span className="data">{nomeDia(dia)} · {dataBr(dia)}<br /></span>
-              {USAR_MOCK && <><i />Modo exemplo</>}
+              <span className="data">{nomeDia(dia)} · {dataBr(dia)}</span>
             </div>
           </div>
         </header>

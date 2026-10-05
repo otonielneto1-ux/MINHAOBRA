@@ -5,8 +5,8 @@ import { useObra } from '../lib/ObraContext.jsx'
 import * as dados from '../lib/dados.js'
 import { pode } from '../lib/permissoes.js'
 import { dataBr } from '../lib/datas.js'
-import { TIPOS_MAO_OBRA } from '../lib/vocabulario.js'
-import { Abas, Cabecalho, Carregando, ErroCaixa, Icone, Secao, Status, useAviso, useCarga } from '../components/index.jsx'
+import { PERFIS, TIPOS_MAO_OBRA } from '../lib/vocabulario.js'
+import { Abas, Cabecalho, Carregando, ErroCaixa, Folha, Icone, Secao, Status, useAviso, useCarga } from '../components/index.jsx'
 import { EnviarImagem } from '../components/capa.jsx'
 
 export default function Cadastros({ params, usuario }) {
@@ -134,11 +134,24 @@ function Funcionarios() {
 
 function Usuarios() {
   const aviso = useAviso()
-  const { obras } = useObra()
+  const { obras, obra } = useObra()
   const { data, erro, carregando, recarregar } = useCarga(dados.listarUsuarios, [])
+  const [editando, setEditando] = useState(null)
+  const [papel, setPapel] = useState(PERFIS.MESTRE)
+  const [salvando, setSalvando] = useState(false)
   if (carregando && !data) return <Carregando />
   if (erro) return <ErroCaixa erro={erro} tentarDeNovo={recarregar} />
   const aguardando = data.filter((u) => u.role === 'Aguardando')
+
+  async function liberar() {
+    setSalvando(true)
+    const { erro: e } = await dados.liberarUsuario(editando.id, papel)
+    setSalvando(false)
+    if (e) { aviso(e); return }
+    aviso(`${editando.nome || editando.email} agora é ${papel}`)
+    setEditando(null)
+    recarregar()
+  }
   return (
     <>
       {aguardando.length > 0 && (
@@ -155,11 +168,34 @@ function Usuarios() {
                 <div className="meta">{u.email} · {u.role === 'Engenheiro' ? 'todas as obras' : u.obras.map((id) => obras.find((o) => o.id === id)?.nome).filter(Boolean).join(', ') || 'sem obra'}</div>
               </div>
               <Status tom={u.role === 'Aguardando' ? 'warn' : 'info'}>{u.role}</Status>
-              {u.role === 'Aguardando' && <button className="btn btn-fill" onClick={() => aviso('Liberar contas chega com o login de verdade')}>Liberar</button>}
+              <button className={`btn ${u.role === 'Aguardando' ? 'btn-fill' : 'btn-quiet'}`}
+                onClick={() => { setPapel(u.role === 'Aguardando' ? PERFIS.MESTRE : u.role); setEditando(u) }}>
+                {u.role === 'Aguardando' ? 'Liberar' : 'Mudar perfil'}
+              </button>
             </div>
           ))}
         </div>
       </section>
+
+      <Folha aberta={!!editando} fechar={() => setEditando(null)} rotulo="Liberar conta">
+        {editando && (
+          <>
+            <div className="lab">{editando.email}</div>
+            <h2>{editando.nome || 'Sem nome'}</h2>
+            <p className="sub">Escolha o perfil. A pessoa passa a ter acesso à obra {obra.nome}.</p>
+            <div className="campo">
+              <label className="lab" htmlFor="papel">Perfil</label>
+              <select id="papel" className="ipt" value={papel} onChange={(e) => setPapel(e.target.value)}>
+                {Object.values(PERFIS).filter((p) => p !== PERFIS.AGUARDANDO).map((p) => <option key={p}>{p}</option>)}
+              </select>
+            </div>
+            <div className="folha-acoes">
+              <button className="btn btn-quiet btn-lg" onClick={() => setEditando(null)}>Cancelar</button>
+              <button className="btn btn-fill btn-lg" onClick={liberar} disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar'}</button>
+            </div>
+          </>
+        )}
+      </Folha>
     </>
   )
 }

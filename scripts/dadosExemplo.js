@@ -1,9 +1,9 @@
-// Dados de exemplo (PRD-FRONTEND.md, "Dados de exemplo"), com os mesmos nomes de
-// campo das tabelas do PRD-BACKEND.md. Na etapa do banco, isto vira a carga inicial.
-// "Hoje" no modo exemplo = quarta, 07/10/2026 (src/lib/config.js).
+// Dados de exemplo da Conviver Costamare (PRD-FRONTEND.md, "Dados de exemplo"), com os mesmos
+// nomes de campo das tabelas do banco. Só servem para gerar a carga inicial: node scripts/gerar-seed.mjs
+// As datas foram pensadas com "hoje" = quarta, 07/10/2026.
 
-import { diasEntre, somarDias, diasDaSemana } from './datas.js'
-import { dividirPremio } from './premio.js'
+import { diasEntre, somarDias, diasDaSemana } from '../src/lib/datas.js'
+import { dividirPremio } from '../src/lib/premio.js'
 
 const OBRA = 1
 

@@ -1,20 +1,17 @@
-// CAMADA DE DADOS — a única porta de entrada dos dados.
-// Nenhuma tela lê o mock nem chama o Supabase direto: tudo passa por aqui.
+// CAMADA DE DADOS — a única porta do banco (Supabase).
+// Nenhuma tela chama o Supabase direto: tudo passa por aqui.
 // Toda função devolve { data, erro }. A obra atual é injetada aqui dentro:
 // as telas nunca passam nem filtram obra_id.
-//
-// Hoje (USAR_MOCK = true) o miolo lê src/lib/mockData.js. Na etapa do banco,
-// só o miolo destas funções muda; nenhuma tela muda.
+// Dinheiro: Engenheiro e Coordenador leem as tabelas; Mestre, Cliente e Técnico leem
+// pelas funções do banco que não devolvem custo nem prêmio (supabase/migrations/…-02-acesso.sql).
 
-import { USAR_MOCK, HOJE_MOCK } from './config.js'
+import { supabase } from './supabase.js'
 import { paraIso, mesesEntre } from './datas.js'
-import { daObra } from './obra.js'
+import { pode } from './permissoes.js'
+import { resultadoBaixa } from './pcp.js'
 import { resumoAvanco, curvaS } from './avanco.js'
 import { servicosAtrasados } from './alertas.js'
-import { pode } from './permissoes.js'
-import { OCORRENCIA_ABERTA } from './vocabulario.js'
-import { resultadoBaixa } from './pcp.js'
-import * as mock from './mockData.js'
+import { tipoDeImagemValido } from './imagem.js'
 
 let obraAtualId = null
 let usuarioAtual = null
@@ -22,274 +19,245 @@ let usuarioAtual = null
 export function definirObraAtual(id) { obraAtualId = id }
 export function definirUsuario(profile) { usuarioAtual = profile }
 
-export function hoje() {
-  return USAR_MOCK ? HOJE_MOCK : paraIso(new Date())
-}
+export const hoje = () => paraIso(new Date())
+export const horaAgora = () => new Date().getHours()
 
-// Hora do aparelho (a saudação usa a hora real mesmo no modo exemplo).
-export function horaAgora() {
-  return new Date().getHours()
-}
-
-const ok = (data) => Promise.resolve({ data: structuredClone(data), erro: null })
-const falha = (erro) => Promise.resolve({ data: null, erro })
 const role = () => usuarioAtual?.role
+const gestao = () => pode(role(), 'verCusto')
+const falha = (erro) => ({ data: null, erro })
 
-// O que um perfil não pode ver não sai da camada (no banco, isso vira visão sem a coluna).
-function semCusto(lista) {
-  return pode(role(), 'verCusto') ? lista : lista.map(({ custo_orcado: _c, ...resto }) => resto)
-}
-function semPremio(lista) {
-  return pode(role(), 'verPremio') ? lista : lista.map(({ valor_premio: _v, ...resto }) => resto)
-}
-
-// ── Login (modo exemplo) ─────────────────────────────────────────────────
-export const listarUsuariosDeExemplo = () => ok(mock.profiles)
-
-// ── Obra ─────────────────────────────────────────────────────────────────
-export function listarMinhasObras() {
-  const u = usuarioAtual
-  if (!u) return ok([])
-  if (u.role === 'Engenheiro') return ok(mock.obras)
-  const ids = mock.obra_usuarios.filter((x) => x.profile_id === u.id).map((x) => x.obra_id)
-  return ok(mock.obras.filter((o) => ids.includes(o.id)))
+// Mensagem que a pessoa entende. As exceções das funções do banco já vêm em português.
+async function q(consulta) {
+  const { data, error } = await consulta
+  if (!error) return { data, erro: null }
+  if (error.code === 'P0001') return falha(error.message)
+  if (error.code === '42501') return falha('Seu perfil não pode fazer isso.')
+  return falha('Não foi possível concluir. Verifique a conexão e tente de novo.')
 }
 
-// ── Capa: foto da obra e logos (todos os perfis veem) ───────────────────
-// No modo exemplo as imagens ficam também no navegador (localStorage), para
-// sobreviver ao recarregar. A chave leva o id da obra. No banco, vão para o Storage.
-const CHAVE = { foto_obra: (id) => `minhaobra:obra:${id}:foto_obra`, logo_cliente: (id) => `minhaobra:obra:${id}:logo_cliente`, logo_construtora: () => 'minhaobra:config:logo_construtora' }
-const CHAVE_NOME_CONSTRUTORA = 'minhaobra:config:nome_construtora'
+// ── Login ────────────────────────────────────────────────────────────────
+export const entrar = (email, senha) => q(supabase.auth.signInWithPassword({ email, password: senha }))
+export const criarConta = (nome, email, senha) => q(supabase.auth.signUp({ email, password: senha, options: { data: { nome } } }))
+export const sair = () => q(supabase.auth.signOut())
+export const sessaoAtual = () => supabase.auth.getSession().then(({ data }) => data.session)
+export const aoMudarSessao = (fn) => supabase.auth.onAuthStateChange((_evento, sessao) => fn(sessao)).data.subscription
 
-// globalThis (e não window): o teste em Node troca o localStorage por um falso.
-function lerGuardado(chave) {
-  try { return globalThis.localStorage?.getItem(chave) ?? null } catch { return null }
+export async function buscarMeuPerfil(authUid) {
+  return q(supabase.from('profiles').select('*').eq('auth_uid', authUid).single())
 }
-function guardar(chave, valor) {
-  try {
-    if (valor === null) globalThis.localStorage.removeItem(chave)
-    else globalThis.localStorage.setItem(chave, valor)
-    return null
-  } catch {
-    return 'Não coube no navegador.'
+
+// ── Obra e capa ──────────────────────────────────────────────────────────
+export const listarMinhasObras = () => q(supabase.from('obras').select('*').order('nome'))
+
+export async function buscarCapa() {
+  const [o, c] = await Promise.all([
+    q(supabase.from('obras').select('*').eq('id', obraAtualId).single()),
+    q(supabase.from('config').select('*').eq('id', 1).single()),
+  ])
+  if (o.erro || c.erro) return falha(o.erro || c.erro)
+  return {
+    data: {
+      obra: o.data.nome, local: `${o.data.cidade}/${o.data.uf}`, cliente: o.data.cliente,
+      foto_obra: o.data.foto_obra, logo_cliente: o.data.logo_cliente,
+      construtora: c.data.nome_construtora, logo_construtora: c.data.logo_construtora,
+    },
+    erro: null,
   }
 }
 
-if (USAR_MOCK) {
-  for (const o of mock.obras) {
-    o.foto_obra = lerGuardado(CHAVE.foto_obra(o.id)) || o.foto_obra
-    o.logo_cliente = lerGuardado(CHAVE.logo_cliente(o.id)) || o.logo_cliente
-  }
-  mock.config.logo_construtora = lerGuardado(CHAVE.logo_construtora()) || mock.config.logo_construtora
-  mock.config.nome_construtora = lerGuardado(CHAVE_NOME_CONSTRUTORA) || mock.config.nome_construtora
-}
-
-export function buscarCapa() {
-  const o = mock.obras.find((x) => x.id === obraAtualId)
-  if (!o) return falha('Obra não encontrada.')
-  return ok({
-    obra: o.nome, local: `${o.cidade}/${o.uf}`, cliente: o.cliente, foto_obra: o.foto_obra, logo_cliente: o.logo_cliente,
-    construtora: mock.config.nome_construtora, logo_construtora: mock.config.logo_construtora,
-  })
-}
-
-// tipo: foto_obra | logo_cliente | logo_construtora. valor: imagem já comprimida, ou null para remover.
-export function salvarImagem(tipo, valor) {
+// tipo: foto_obra | logo_cliente | logo_construtora. imagem: data URL já comprimida, ou null para remover.
+export async function salvarImagem(tipo, imagem) {
   if (!pode(role(), 'gerirCadastros')) return falha('Seu perfil não troca as imagens.')
-  if (!Object.hasOwn(CHAVE, tipo)) return falha('Imagem desconhecida.')
-  const erro = guardar(CHAVE[tipo](obraAtualId), valor)
-  if (erro) return falha(`${erro} Tente uma imagem menor.`)
-  if (tipo === 'logo_construtora') mock.config.logo_construtora = valor
-  else mock.obras.find((x) => x.id === obraAtualId)[tipo] = valor
-  return ok(true)
+  if (!tipoDeImagemValido(tipo)) return falha('Imagem desconhecida.')
+  let url = null
+  if (imagem) {
+    const blob = await (await fetch(imagem)).blob()
+    const extensao = blob.type === 'image/png' ? 'png' : 'jpg'
+    const pasta = tipo === 'logo_construtora' ? 'config' : `obras/${obraAtualId}`
+    // Nome novo a cada envio: o navegador não fica mostrando a imagem antiga guardada.
+    const caminho = `${pasta}/${tipo}-${Date.now()}.${extensao}`
+    const envio = await q(supabase.storage.from('capa').upload(caminho, blob, { contentType: blob.type }))
+    if (envio.erro) return falha('Não foi possível enviar a imagem. Tente de novo.')
+    url = supabase.storage.from('capa').getPublicUrl(caminho).data.publicUrl
+  }
+  // ponytail: a imagem antiga fica no Storage ao trocar/remover; limpar quando o espaço pesar.
+  return tipo === 'logo_construtora'
+    ? q(supabase.from('config').update({ logo_construtora: url }).eq('id', 1))
+    : q(supabase.from('obras').update({ [tipo]: url }).eq('id', obraAtualId))
 }
 
-export function salvarNomeConstrutora(nome) {
+export async function salvarNomeConstrutora(nome) {
   if (!pode(role(), 'gerirCadastros')) return falha('Seu perfil não altera a construtora.')
   if (!nome?.trim()) return falha('Informe o nome da construtora.')
-  const erro = guardar(CHAVE_NOME_CONSTRUTORA, nome.trim())
-  if (erro) return falha(erro)
-  mock.config.nome_construtora = nome.trim()
-  return ok(true)
+  return q(supabase.from('config').update({ nome_construtora: nome.trim() }).eq('id', 1))
 }
 
 export const listarEtapas = () =>
-  ok(daObra(mock.etapas_entrega, obraAtualId).sort((a, b) => a.ordem - b.ordem))
+  q(supabase.from('etapas_entrega').select('*').eq('obra_id', obraAtualId).order('ordem'))
 
 // ── Cronograma ───────────────────────────────────────────────────────────
-export function listarServicos({ incluirCancelados = false } = {}) {
-  let lista = daObra(mock.servicos, obraAtualId)
-  if (!incluirCancelados) lista = lista.filter((s) => !s.cancelado)
-  lista.sort((a, b) => a.codigo_eap.localeCompare(b.codigo_eap, 'pt-BR', { numeric: true }))
-  return ok(semCusto(lista))
+const porEap = (a, b) => a.codigo_eap.localeCompare(b.codigo_eap, 'pt-BR', { numeric: true })
+
+export async function listarServicos({ incluirCancelados = false } = {}) {
+  const r = gestao()
+    ? await q(supabase.from('servicos').select('*').eq('obra_id', obraAtualId))
+    : await q(supabase.rpc('servicos_sem_custo', { p_obra: obraAtualId }))
+  if (r.erro) return r
+  const lista = r.data.filter((s) => incluirCancelados || !s.cancelado).sort(porEap)
+  // Quem não vê custo recebe só o peso relativo; ele não sai daqui para as telas.
+  return { data: lista.map(({ peso: _p, ...s }) => s), erro: null }
 }
 
-// Avanço da obra só em percentuais — é o que o Cliente recebe (no banco, uma função
-// que pondera pelo custo por dentro e não devolve custo nenhum).
-export function avancoDaObra() {
-  const obra = mock.obras.find((o) => o.id === obraAtualId)
-  if (!obra) return falha('Obra não encontrada.')
-  const servicos = daObra(mock.servicos, obraAtualId).filter((s) => !s.cancelado)
-  const producoes = daObra(mock.producoes, obraAtualId)
-  const etapas = daObra(mock.etapas_entrega, obraAtualId).sort((a, b) => a.ordem - b.ordem)
-  const dia = hoje()
-  const temCronograma = servicos.some((s) => !s.e_resumo)
-  return ok({
-    temCronograma,
-    geral: resumoAvanco(servicos, dia),
-    etapas: etapas.map((e) => ({ id: e.id, nome: e.nome, data_entrega_contratual: e.data_entrega_contratual, ...resumoAvanco(servicos, dia, e.id) })),
-    curva: temCronograma ? curvaS(servicos, producoes, mesesEntre(obra.data_inicio, obra.data_fim_contrato), dia) : [],
-    atrasados: servicosAtrasados(servicos, dia),
-  })
+export async function buscarServico(id) {
+  const r = await listarServicos({ incluirCancelados: true })
+  if (r.erro) return r
+  const s = r.data.find((x) => x.id === id)
+  return s ? { data: s, erro: null } : falha('Serviço não encontrado.')
 }
 
-export function buscarServico(id) {
-  const s = daObra(mock.servicos, obraAtualId).find((x) => x.id === id)
-  return s ? ok(semCusto([s])[0]) : falha('Serviço não encontrado.')
-}
-
-export function listarDependencias() {
-  const ids = new Set(daObra(mock.servicos, obraAtualId).map((s) => s.id))
-  return ok(mock.servico_dependencias.filter((d) => ids.has(d.servico_id)))
+export async function listarDependencias() {
+  const [s, d] = await Promise.all([listarServicos({ incluirCancelados: true }), q(supabase.from('servico_dependencias').select('*'))])
+  if (s.erro || d.erro) return falha(s.erro || d.erro)
+  const ids = new Set(s.data.map((x) => x.id))
+  return { data: d.data.filter((x) => ids.has(x.servico_id)), erro: null }
 }
 
 export function listarProducoes({ servicoId } = {}) {
-  let lista = daObra(mock.producoes, obraAtualId)
-  if (servicoId) lista = lista.filter((p) => p.servico_id === servicoId)
-  return ok(lista.sort((a, b) => b.data.localeCompare(a.data)))
+  let c = supabase.from('producoes').select('*').eq('obra_id', obraAtualId)
+  if (servicoId) c = c.eq('servico_id', servicoId)
+  return q(c.order('data', { ascending: false }))
 }
 
-export const listarRestricoes = () => ok(daObra(mock.restricoes, obraAtualId))
+export const listarRestricoes = () => q(supabase.from('restricoes').select('*').eq('obra_id', obraAtualId))
+
+// Avanço da obra só em percentuais (tela do Cliente). Quem não vê custo pondera pelo peso
+// relativo que o banco calcula; Engenheiro e Coordenador, pelo custo.
+export async function avancoDaObra() {
+  const [o, e, s, p] = await Promise.all([
+    q(supabase.from('obras').select('data_inicio, data_fim_contrato').eq('id', obraAtualId).single()),
+    listarEtapas(),
+    gestao()
+      ? q(supabase.from('servicos').select('*').eq('obra_id', obraAtualId))
+      : q(supabase.rpc('servicos_sem_custo', { p_obra: obraAtualId })),
+    q(supabase.rpc('producoes_resumo', { p_obra: obraAtualId })),
+  ])
+  const erro = [o, e, s, p].find((x) => x.erro)?.erro
+  if (erro) return falha(erro)
+  const servicos = s.data.filter((x) => !x.cancelado).map((x) => ('peso' in x ? { ...x, custo_orcado: x.peso } : x))
+  const dia = hoje()
+  return {
+    data: {
+      temCronograma: servicos.some((x) => !x.e_resumo),
+      geral: resumoAvanco(servicos, dia),
+      etapas: e.data.map((et) => ({ id: et.id, nome: et.nome, data_entrega_contratual: et.data_entrega_contratual, ...resumoAvanco(servicos, dia, et.id) })),
+      curva: curvaS(servicos, p.data, mesesEntre(o.data.data_inicio, o.data.data_fim_contrato), dia),
+      atrasados: servicosAtrasados(servicos, dia),
+    },
+    erro: null,
+  }
+}
 
 // ── PCP ──────────────────────────────────────────────────────────────────
 export function listarAtividades({ de, ate } = {}) {
-  let lista = daObra(mock.pcp_atividades, obraAtualId)
-  if (de) lista = lista.filter((a) => a.data_prevista >= de)
-  if (ate) lista = lista.filter((a) => a.data_prevista <= ate)
-  return ok(lista.sort((a, b) => a.data_prevista.localeCompare(b.data_prevista) || a.id - b.id))
+  let c = supabase.from('pcp_atividades').select('*').eq('obra_id', obraAtualId)
+  if (de) c = c.gte('data_prevista', de)
+  if (ate) c = c.lte('data_prevista', ate)
+  return q(c.order('data_prevista').order('id'))
 }
 
-// Baixa: decide o status pela regra (lib/pcp.js), grava a produção e soma no serviço e no pacote.
-export function darBaixa(atividadeId, { executada, motivo }) {
+// A regra da baixa roda aqui (mensagem rápida) e de novo no banco (dar_baixa), que grava a produção.
+export async function darBaixa(atividadeId, { executada, motivo }) {
   if (!pode(role(), 'darBaixa')) return falha('Seu perfil não dá baixa.')
-  const a = daObra(mock.pcp_atividades, obraAtualId).find((x) => x.id === atividadeId)
-  if (!a) return falha('Atividade não encontrada.')
-  const r = resultadoBaixa(a.quantidade_planejada, executada, motivo)
-  if (r.erro) return falha(r.erro)
-  desfazerProducao(a)
-  Object.assign(a, {
-    status: r.status, quantidade_executada: Number(executada), motivo_nao_conclusao: r.motivo,
-    baixa_por: usuarioAtual.id, baixa_em: new Date().toISOString(),
-  })
-  if (Number(executada) > 0) {
-    mock.producoes.push({
-      id: Math.max(0, ...mock.producoes.map((p) => p.id)) + 1, obra_id: a.obra_id, data: a.data_prevista,
-      servico_id: a.servico_id, quantidade: Number(executada), origem: 'PCP', pcp_atividade_id: a.id,
-      pacote_id: a.pacote_id, motivo_ajuste: null, lancado_por: usuarioAtual.id,
-    })
-    somar(a, Number(executada))
+  const { data: a } = await q(supabase.from('pcp_atividades').select('quantidade_planejada').eq('id', atividadeId).single())
+  if (a) {
+    const r = resultadoBaixa(a.quantidade_planejada, executada, motivo)
+    if (r.erro) return falha(r.erro)
   }
-  return ok(a)
+  return q(supabase.rpc('dar_baixa', { p_atividade: atividadeId, p_executada: Number(executada), p_motivo: motivo || null }))
 }
 
-export function desfazerBaixa(atividadeId) {
-  const a = daObra(mock.pcp_atividades, obraAtualId).find((x) => x.id === atividadeId)
-  if (!a) return falha('Atividade não encontrada.')
-  desfazerProducao(a)
-  Object.assign(a, { status: 'Planejada', quantidade_executada: null, motivo_nao_conclusao: null, baixa_por: null, baixa_em: null })
-  return ok(a)
-}
-
-function desfazerProducao(a) {
-  const i = mock.producoes.findIndex((p) => p.pcp_atividade_id === a.id)
-  if (i < 0) return
-  somar(a, -mock.producoes[i].quantidade)
-  mock.producoes.splice(i, 1)
-}
-
-function somar(a, q) {
-  const s = mock.servicos.find((x) => x.id === a.servico_id)
-  if (s) s.quantidade_executada = Math.round((s.quantidade_executada + q) * 1000) / 1000
-  const p = a.pacote_id && mock.pacotes.find((x) => x.id === a.pacote_id)
-  if (p) p.quantidade_executada = Math.round((p.quantidade_executada + q) * 1000) / 1000
-}
+export const desfazerBaixa = (atividadeId) => q(supabase.rpc('desfazer_baixa', { p_atividade: atividadeId }))
 
 // ── Pacotes ──────────────────────────────────────────────────────────────
-export const listarPacotes = () => ok(semPremio(daObra(mock.pacotes, obraAtualId)))
+export const listarPacotes = () => (gestao()
+  ? q(supabase.from('pacotes').select('*').eq('obra_id', obraAtualId))
+  : q(supabase.rpc('pacotes_sem_premio', { p_obra: obraAtualId })))
 
-export function buscarPacote(id) {
-  const p = daObra(mock.pacotes, obraAtualId).find((x) => x.id === id)
-  return p ? ok(semPremio([p])[0]) : falha('Pacote não encontrado.')
+export async function buscarPacote(id) {
+  const r = await listarPacotes()
+  if (r.erro) return r
+  const p = r.data.find((x) => x.id === id)
+  return p ? { data: p, erro: null } : falha('Pacote não encontrado.')
 }
 
-export function listarPremios({ pacoteId } = {}) {
-  if (!pode(role(), 'verPremio')) return ok([])
-  const ids = new Set(daObra(mock.pacotes, obraAtualId).map((p) => p.id))
-  let lista = mock.premios.filter((p) => ids.has(p.pacote_id))
-  if (pacoteId) lista = lista.filter((p) => p.pacote_id === pacoteId)
-  return ok(lista)
+export async function listarPremios({ pacoteId } = {}) {
+  if (!pode(role(), 'verPremio')) return { data: [], erro: null }
+  const p = await listarPacotes()
+  if (p.erro) return p
+  const ids = p.data.map((x) => x.id).filter((id) => !pacoteId || id === pacoteId)
+  return q(supabase.from('premios').select('*').in('pacote_id', ids))
 }
 
 // ── Equipe e efetivo ─────────────────────────────────────────────────────
 export function listarFuncionarios({ soAtivos = false } = {}) {
-  let lista = daObra(mock.funcionarios, obraAtualId)
-  if (soAtivos) lista = lista.filter((f) => f.ativo)
-  return ok(lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
+  let c = supabase.from('funcionarios').select('*').eq('obra_id', obraAtualId)
+  if (soAtivos) c = c.eq('ativo', true)
+  return q(c.order('nome'))
 }
 
 export function listarPresencas({ data, de, ate, pacoteId } = {}) {
-  let lista = daObra(mock.presencas, obraAtualId)
-  if (data) lista = lista.filter((p) => p.data === data)
-  if (de) lista = lista.filter((p) => p.data >= de)
-  if (ate) lista = lista.filter((p) => p.data <= ate)
-  if (pacoteId) lista = lista.filter((p) => p.pacote_id === pacoteId)
-  return ok(lista)
+  let c = supabase.from('presencas').select('*').eq('obra_id', obraAtualId)
+  if (data) c = c.eq('data', data)
+  if (de) c = c.gte('data', de)
+  if (ate) c = c.lte('data', ate)
+  if (pacoteId) c = c.eq('pacote_id', pacoteId)
+  return q(c)
 }
 
-// Grava o efetivo de um dia inteiro: uma linha por funcionário.
+// Grava o efetivo de um dia inteiro: uma linha por funcionário (atualiza se já existir).
 export function salvarEfetivo(data, linhas) {
-  if (!pode(role(), 'lancarEfetivo')) return falha('Seu perfil não lança efetivo.')
-  for (const l of linhas) {
-    const existente = mock.presencas.find((p) => p.obra_id === obraAtualId && p.data === data && p.funcionario_id === l.funcionario_id)
-    const pacote_id = l.situacao === 'Presente' ? l.pacote_id || null : null
-    if (existente) Object.assign(existente, { situacao: l.situacao, pacote_id, lancado_por: usuarioAtual.id })
-    else mock.presencas.push({ id: Math.max(0, ...mock.presencas.map((p) => p.id)) + 1, obra_id: obraAtualId, data, funcionario_id: l.funcionario_id, situacao: l.situacao, pacote_id, lancado_por: usuarioAtual.id })
-  }
-  return ok(linhas.length)
+  if (!pode(role(), 'lancarEfetivo')) return Promise.resolve(falha('Seu perfil não lança efetivo.'))
+  const registros = linhas.map((l) => ({
+    obra_id: obraAtualId, data, funcionario_id: l.funcionario_id, situacao: l.situacao,
+    pacote_id: l.situacao === 'Presente' ? l.pacote_id || null : null, lancado_por: usuarioAtual.id,
+  }))
+  return q(supabase.from('presencas').upsert(registros, { onConflict: 'funcionario_id,data' }))
 }
 
 // ── Ocorrências ──────────────────────────────────────────────────────────
-export function listarOcorrencias() {
-  let lista = daObra(mock.ocorrencias, obraAtualId).sort((a, b) => b.aberta_em.localeCompare(a.aberta_em))
+export async function listarOcorrencias() {
+  const r = await q(supabase.from('ocorrencias').select('*').eq('obra_id', obraAtualId).order('aberta_em', { ascending: false }))
+  if (r.erro || role() !== 'Cliente') return r
   // O cliente acompanha status, prazo e resposta; não vê o responsável interno.
-  if (role() === 'Cliente') lista = lista.map(({ responsavel_id: _r, ...o }) => o)
-  return ok(lista)
+  return { data: r.data.map(({ responsavel_id: _r, ...o }) => o), erro: null }
 }
 
-export function buscarOcorrencia(id) {
-  return listarOcorrencias().then(({ data }) => {
-    const o = data.find((x) => x.id === id)
-    return o ? { data: o, erro: null } : { data: null, erro: 'Ocorrência não encontrada.' }
-  })
+export async function buscarOcorrencia(id) {
+  const r = await listarOcorrencias()
+  if (r.erro) return r
+  const o = r.data.find((x) => x.id === id)
+  return o ? { data: o, erro: null } : falha('Ocorrência não encontrada.')
 }
 
 export function criarOcorrencia({ titulo, local, etapa_entrega_id, descricao }) {
-  if (!pode(role(), 'abrirOcorrencia')) return falha('Seu perfil não abre ocorrência.')
-  if (!titulo?.trim() || !local?.trim() || !descricao?.trim()) return falha('Preencha título, local e descrição.')
-  const daObraAtual = daObra(mock.ocorrencias, obraAtualId)
-  const nova = {
-    id: Math.max(0, ...mock.ocorrencias.map((o) => o.id)) + 1, obra_id: obraAtualId,
-    numero: Math.max(0, ...daObraAtual.map((o) => o.numero)) + 1, titulo: titulo.trim(), local: local.trim(),
-    etapa_entrega_id: etapa_entrega_id || null, descricao: descricao.trim(), status: OCORRENCIA_ABERTA, aberta_por: usuarioAtual.id,
-    responsavel_id: null, prazo: null, resposta: null, aberta_em: hoje(), respondida_em: null, fechada_em: null,
-  }
-  mock.ocorrencias.push(nova)
-  return ok(nova)
+  if (!pode(role(), 'abrirOcorrencia')) return Promise.resolve(falha('Seu perfil não abre ocorrência.'))
+  if (!titulo?.trim() || !local?.trim() || !descricao?.trim()) return Promise.resolve(falha('Preencha título, local e descrição.'))
+  return q(supabase.from('ocorrencias').insert({
+    obra_id: obraAtualId, titulo: titulo.trim(), local: local.trim(), etapa_entrega_id: etapa_entrega_id || null,
+    descricao: descricao.trim(), aberta_por: usuarioAtual.id,
+  }).select().single())
 }
 
-export const listarPessoas = () => ok(mock.profiles.map(({ id, nome, role: r }) => ({ id, nome, role: r })))
+// ── Pessoas e usuários ───────────────────────────────────────────────────
+export const listarPessoas = () => q(supabase.rpc('pessoas_da_obra', { p_obra: obraAtualId }))
 
-export function listarUsuarios() {
-  if (!pode(role(), 'gerirUsuarios')) return ok([])
-  return ok(mock.profiles.map((p) => ({ ...p, obras: mock.obra_usuarios.filter((x) => x.profile_id === p.id).map((x) => x.obra_id) })))
+export async function listarUsuarios() {
+  if (!pode(role(), 'gerirUsuarios')) return { data: [], erro: null }
+  const [p, ou] = await Promise.all([q(supabase.from('profiles').select('*').order('nome')), q(supabase.from('obra_usuarios').select('*'))])
+  if (p.erro || ou.erro) return falha(p.erro || ou.erro)
+  return { data: p.data.map((x) => ({ ...x, obras: ou.data.filter((v) => v.profile_id === x.id).map((v) => v.obra_id) })), erro: null }
 }
+
+// Libera uma conta: escolhe o perfil e dá acesso à obra atual (só o Engenheiro).
+export const liberarUsuario = (profileId, papel) =>
+  q(supabase.rpc('liberar_usuario', { p_profile: profileId, p_role: papel, p_obra: obraAtualId }))

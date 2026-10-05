@@ -1,28 +1,39 @@
-import { useState } from 'react'
-import { definirUsuario } from './lib/dados.js'
+import { useEffect, useState } from 'react'
+import * as dados from './lib/dados.js'
 import { perfilLiberado } from './lib/permissoes.js'
 import { ObraProvider, useObra } from './lib/ObraContext.jsx'
-import { AvisoProvider, Carregando, Vazio } from './components/index.jsx'
-import Entrada from './pages/Entrada.jsx'
+import { AvisoProvider, Carregando, ErroCaixa, Vazio } from './components/index.jsx'
+import Login from './pages/Login.jsx'
 import Aguardando from './pages/Aguardando.jsx'
 import Shell from './pages/Shell.jsx'
 
-// Modo exemplo: escolhe-se um usuário de exemplo na entrada.
-// Na etapa do Supabase, aqui passa a escutar o login real e buscar o `profiles`.
+// Escuta o login do Supabase e busca o perfil (profiles) de quem entrou.
 export default function App() {
+  const [sessao, setSessao] = useState(undefined)
   const [usuario, setUsuario] = useState(null)
+  const [erro, setErro] = useState(null)
 
-  function entrar(profile) {
-    definirUsuario(profile)
-    setUsuario(profile)
-  }
+  useEffect(() => {
+    dados.sessaoAtual().then(setSessao)
+    const inscricao = dados.aoMudarSessao(setSessao)
+    return () => inscricao.unsubscribe()
+  }, [])
 
-  function sair() {
-    definirUsuario(null)
-    setUsuario(null)
-  }
+  useEffect(() => {
+    if (!sessao) { dados.definirUsuario(null); setUsuario(null); return }
+    dados.buscarMeuPerfil(sessao.user.id).then(({ data, erro: e }) => {
+      if (e) { setErro(e); return }
+      dados.definirUsuario(data)
+      setUsuario(data)
+    })
+  }, [sessao?.user?.id])
 
-  if (!usuario) return <Entrada entrar={entrar} />
+  const sair = () => dados.sair()
+
+  if (sessao === undefined) return <Carregando />
+  if (!sessao) return <Login />
+  if (erro) return <div className="content"><ErroCaixa erro={erro} tentarDeNovo={() => location.reload()} /></div>
+  if (!usuario) return <Carregando />
   if (!perfilLiberado(usuario.role)) return <Aguardando usuario={usuario} sair={sair} />
 
   return (
