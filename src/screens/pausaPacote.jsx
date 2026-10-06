@@ -4,7 +4,7 @@
 
 import { useState } from 'react'
 import * as dados from '../lib/dados.js'
-import { destinosPossiveis, validarPausa, validarRemanejo } from '../lib/premio.js'
+import { destinosPossiveis, saidaDesde, validarPausa, validarRemanejo } from '../lib/premio.js'
 import { dataBr } from '../lib/datas.js'
 import { Folha, useAoAbrir } from '../components/index.jsx'
 import { EscolherMotivo } from '../components/motivo.jsx'
@@ -71,7 +71,7 @@ export function FolhaPausa({ aberta, pacote: p, pacotes, funcionarios, hoje, fec
         <>
           <div className="campo" style={{ maxWidth: 220 }}>
             <label className="lab" htmlFor="entrada-pacote">Entra no outro pacote em</label>
-            <input id="entrada-pacote" type="date" className="ipt" min={levar ? p.pausa_desde : campos.data} value={campos.entrada} onChange={(e) => mudar('entrada', e.target.value)} />
+            <input id="entrada-pacote" type="date" className="ipt" min={saidaDesde(p, levar ? null : campos.data) ?? undefined} value={campos.entrada} onChange={(e) => mudar('entrada', e.target.value)} />
             <span className="meta">Quem entra depois do início recebe proporcional aos dias úteis no pacote.</span>
           </div>
           <div className="campo">

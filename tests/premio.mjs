@@ -1,5 +1,5 @@
 // Prêmio de produção: proporcional aos dias, só mão de obra própria, centavo sobrando para quem tem mais dias.
-import { premioReal, metaDoCronograma, metaEditada, diasUteisAteFechamento, renovacoesPendentes, camposDaRenovacao, dividirIgual, colaboradoresPorParte, pacoteBateuMeta, validarPacote, proximoFechamento, previaFechamento, fechamentosAnteriores, planilhaPremios, linhasDosPremios, pctPacote, pctServicoDoPacote, diasPorFuncionario, valoresDoPacote, premioDoPacote, ehAjudante, dividirParte, fatorDoPremio, entrouEm, validarPausa, destinosPossiveis, validarRemanejo, ritmoDaMeta, pctPrevisto, elegiveisAoPacote, metaAoMudarData, fechamentoDoMes, resumoDaFolha, validarAjustePremio, linhasDosAjustes, ajustesDaFolha } from '../src/lib/premio.js'
+import { premioReal, metaDoCronograma, metaEditada, diasUteisAteFechamento, renovacoesPendentes, camposDaRenovacao, dividirIgual, colaboradoresPorParte, pacoteBateuMeta, validarPacote, proximoFechamento, previaFechamento, fechamentosAnteriores, planilhaPremios, linhasDosPremios, pctPacote, pctServicoDoPacote, diasPorFuncionario, valoresDoPacote, premioDoPacote, ehAjudante, dividirParte, fatorDoPremio, entrouEm, validarPausa, destinosPossiveis, validarRemanejo, saidaDesde, ritmoDaMeta, pctPrevisto, elegiveisAoPacote, metaAoMudarData, fechamentoDoMes, resumoDaFolha, validarAjustePremio, linhasDosAjustes, ajustesDaFolha } from '../src/lib/premio.js'
 
 let ok = 0
 let tot = 0
@@ -182,6 +182,8 @@ const aPausar = { ...pausado, status: 'Em execução', pausa_desde: null, pausa_
 conferir('pausar e levar: entrada antes da pausa lançada junto recusa', validarRemanejo({ destino: '10', colaboradores: [1], data: '2026-10-08', pausa: '2026-10-09' }, destinos, aPausar).erro,
   'A equipe só sai do pacote pausado a partir do dia da pausa.')
 conferir('pausar e levar: entrada no dia da pausa vale', validarRemanejo({ destino: '10', colaboradores: [1], data: '2026-10-09', pausa: '2026-10-09' }, destinos, aPausar), { destino: 10, colaboradores: [1], data: '2026-10-09' })
+conferir('saída a partir de: pausa lançada junto, senão a da origem, senão sem limite', [saidaDesde(aPausar, '2026-10-09'), saidaDesde(pausado, null), saidaDesde(aPausar, '')],
+  ['2026-10-09', '2026-10-08', null])
 
 // ── % pago sobre o orçamento ──
 conferir('prêmio real = MO orçada × %', premioReal({ pct_pago: 30, servicos: [ps(22, 1, 0, 1200, 600)] }), { profissional: 360, ajudante: 180, total: 540 })

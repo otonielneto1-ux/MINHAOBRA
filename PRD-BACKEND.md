@@ -281,10 +281,11 @@ Quem participa do pacote: só eles recebem o prêmio e só para eles o efetivo a
 | funcionario_id | int8 | sim | → funcionarios (da mesma obra, não terceirizado); único por pacote |
 | entrou_em | date | não | null = desde o início; com data depois do início, recebe proporcional aos dias úteis |
 | saiu_em | date | não | levado do pacote pausado para outro (função `remanejar_colaboradores` com origem) |
-| pct_saida | numeric(5,2) | não | % da meta atingida com a produção do pacote de antes da saída (junto com saiu_em); recebe a parte cheia × este %, garantido |
+| pct_saida | numeric(5,2) | não | % da meta atingida com a produção do pacote de antes da pausa (pausa_na_saida; junto com saiu_em); recebe a parte cheia × este %, garantido |
+| pausa_na_saida | date | não | dia da pausa na hora da saída (junto com saiu_em, ≤ saiu_em); guardado porque o Retomar apaga `pausa_desde` |
 | metas_saida | jsonb | não | meta de cada serviço na hora da saída (`{servico_id: meta}`, junto com saiu_em); o pct_saida é sempre contra ela — editar a meta depois não muda o garantido; trocar % por quantidade converte |
 
-**Regra:** quem saiu não é apagado ao editar o pacote nem vai na renovação; `saiu_em`/`pct_saida` só pela função. Pausar com data no passado tira do pacote as baixas do dia da pausa em diante (antes de calcular o % de quem sai); retomar liga de volta as atividades sem pacote. A saída é a partir do dia da pausa (`saiu_em` ≥ `pausa_desde`). Baixa atrasada de dia anterior à saída que entra no pacote (ou a correção dela) recalcula `pct_saida`, para cima ou para baixo, pelo gatilho de produções, enquanto o pacote não fecha; produção de depois da saída não entra.
+**Regra:** quem saiu não é apagado ao editar o pacote nem vai na renovação; `saiu_em`/`pct_saida` só pela função. Pausar com data no passado tira do pacote as baixas do dia da pausa em diante (antes de calcular o % de quem sai); retomar liga de volta as atividades sem pacote. A saída é a partir do dia da pausa (`saiu_em` ≥ `pausa_desde`). Baixa atrasada de dia anterior à pausa que entra no pacote (ou a correção dela) recalcula `pct_saida`, para cima ou para baixo, pelo gatilho de produções, enquanto o pacote não fecha; produção do dia da pausa em diante não entra, nem se o pacote for retomado antes de a equipe entrar no outro.
 
 ## Tabela `premio_ajustes`
 

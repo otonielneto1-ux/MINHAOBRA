@@ -270,13 +270,15 @@ export function validarPausa({ motivo, data }, p, hoje) {
 export const destinosPossiveis = (pacotes, origem, data) => pacotes.filter((p) => p.id !== origem.id && !p.fechado_em
   && p.status !== PACOTE.PAUSADO && (!data || data <= p.data_fechamento))
 
+// Primeiro dia em que a equipe pode sair do pacote: o dia da pausa (pausa = a que está sendo lançada junto; sem ela, a
+// pausa_desde da origem). Mesma regra de remanejar_colaboradores no banco.
+export const saidaDesde = (origem, pausa) => pausa || origem.pausa_desde || null
+
 // obrigatorio: só levar a equipe (pacote já pausado); senão o destino é opcional e sem destino devolve null.
-// pausa: dia da pausa que está sendo lançada junto; sem ela, a pausa_desde da origem. A equipe sai a partir desse dia
-// (mesma regra de remanejar_colaboradores no banco).
 export function validarRemanejo({ destino, colaboradores, data, pausa }, pacotes, origem, obrigatorio = false) {
   if (!destino) return obrigatorio ? { erro: 'Escolha o pacote de destino.' } : null
   if (!data) return { erro: 'Informe a data em que a equipe entra no outro pacote.' }
-  const desde = pausa ?? origem.pausa_desde
+  const desde = saidaDesde(origem, pausa)
   if (desde && data < desde) return { erro: 'A equipe só sai do pacote pausado a partir do dia da pausa.' }
   if (!destinosPossiveis(pacotes, origem, data).some((p) => p.id === Number(destino))) return { erro: 'Escolha um pacote aberto e não pausado.' }
   if (!colaboradores?.length) return { erro: 'Escolha quem vai para o outro pacote.' }
