@@ -277,6 +277,16 @@ export function Pizza({ titulo, fatias, vazio }) {
   )
 }
 
+// Baixa um texto como arquivo. O BOM no início faz o Excel abrir acentos (UTF-8) direito.
+export function baixarArquivo(nome, texto, tipo = 'text/csv;charset=utf-8') {
+  const url = URL.createObjectURL(new Blob(['\ufeff' + texto], { type: tipo }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = nome
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export function Abas({ abas, atual, trocar }) {
   return (
     <div className="abas" role="tablist">

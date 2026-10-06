@@ -303,29 +303,37 @@ Histórico: "Nenhuma produção lançada neste serviço."
 
 **O que aparece**
 1. Filtro: status, serviço, data de fechamento; botão **Fechar pacotes do mês** (Eng/Coord).
-2. Computador: quadro com colunas Planejado, Liberado, Em execução, Concluído, Não concluído. Celular: lista com etiqueta de status.
-3. Cartão: nome, serviço, local, barra executada/meta (ex.: "260 / 400 m · 65%"), fechamento (ex.: "fecha 20/10 · 16 dias"), valor do prêmio (só Eng/Coord), cadeado se fechado.
+2. Computador: quadro com colunas Planejado, Liberado, Em execução, Pausado, Concluído, Não concluído. Celular: lista com etiqueta de status. Cartão pausado mostra desde quando e o problema.
+3. Cartão: nome, serviço(s) ("Galeria + 1"), local, barra do % da meta (média dos serviços, cada um até 100%), número de colaboradores, fechamento (ex.: "fecha 20/10 · 16 dias"), valor do prêmio (só Eng/Coord), cadeado se fechado.
 
 **Campos do pacote**
 
 | Campo | Tipo | Obrigatório | Observação |
 |---|---|---|---|
-| Nome | texto | sim | |
-| Serviço | escolha | sim | só não resumo |
-| Local | texto | sim | |
-| Quantidade-meta | número | sim | na unidade do serviço (% ou m, m², m³, kg, t, un) |
-| Valor do prêmio | dinheiro | sim | |
+| Nome do pacote | texto | sim | |
+| Serviços | lista | sim, pelo menos um | serviços do cronograma (não resumo); "+ Incluir outro serviço"; cada um com: |
+| · Quantidade-meta | número | sim | vem sozinha do cronograma (previsto entre o início do pacote e o dia 20, segunda a sexta); editável — editada fica em destaque com "o cronograma prevê X" e o atalho "usar a do cronograma". Abaixo: quantidade total do serviço no cronograma, quanto ele prevê no período, em quantos dias úteis (seg–sex), e a **produção média por dia** para cumprir a meta nesses dias |
+| · MO profissional | dinheiro | não (vazio = 0) | valor de **orçamento**; a parte paga vai para os colaboradores profissionais |
+| · MO ajudante | dinheiro | não (vazio = 0) | valor de **orçamento**; a parte paga vai para os colaboradores serventes |
+| · MO total | calculado | — | MO profissional + MO ajudante (orçamento) |
+| % pago sobre o orçamento | número | sim | de 1 a 100; prêmio pago = MO orçada × %; a janela mostra orçado → pago de cada parte |
+| Local | texto | sim | sugere o local do primeiro serviço |
+| Colaboradores | marcar vários | não | funcionários ativos de mão de obra própria, em dois grupos: Profissionais e Ajudantes; só eles recebem o prêmio — **em partes iguais** dentro de cada parte (a janela mostra quanto cada profissional e cada ajudante recebe) — e só para eles o pacote aparece no Efetivo. Marcado num pacote que já começou: "entra hoje", recebe proporcional aos dias úteis |
 | Data de início | data | sim | |
 | Data de fechamento | data | sim | sugere o próximo dia de fechamento da folha da obra |
-| Status | escolha | sim | Planejado, Liberado, Em execução, Concluído, Não concluído |
-| Motivo | escolha | quando Não concluído | lista de motivos |
+| Status | escolha | sim | Planejado, Liberado, Em execução (Pausado sai do botão Pausar; Concluído e Não concluído, do fechamento da folha) |
+| Motivo | escolha (grupo, depois causa) | no fechamento, quando não bateu a meta | mesma lista do PCP |
 
 **Ações**
 - **Novo pacote**, **Editar** (enquanto não fechado), **Mudar status**, **Excluir** (Engenheiro, só Planejado).
+- **Pergunta do dia 21** (no topo do quadro, Eng/Coord): para cada pacote cujo fechamento passou e ainda sem resposta, "continua no próximo período?" — **Sim, renovar** abre o pacote do período seguinte preenchido; **Não** encerra. O Início avisa 7 e 3 dias úteis antes do fechamento.
+- **Pausar** (Eng/Coord, no detalhe): problema (grupo, depois causa), data em que parou e, se quiser, **levar a equipe para outro pacote** (destino aberto e não pausado, data de entrada, quem vai). Pacote pausado mostra **Retomar** e **Levar equipe para outro pacote**; o aviso diz quanto pagaria se fechasse pausado (% executado).
+- **Na Semana:** a atividade mostra o pacote ligado sozinho; com dois pacotes possíveis no dia, o campo Pacote pede para escolher (também no Distribuir).
+- **Aba Resumo** (ao lado do quadro): data da folha (sugere a do mês); lista dos funcionários em pacotes que fecham naquele mês, com nº de pacotes e total (Eng/Coord). Clicar no funcionário abre os pacotes dele — status, entrou/saiu e o valor: pago (fechado), "se bater a meta", "se fechar pausado" ou "saiu com X% da meta (garantido)" — os ajustes e o total. Eng/Coord lançam **ajuste** (valor em R$, negativo = desconto, e motivo) e excluem; o Mestre vê só os pacotes, sem valores.
 - **Clicar no cartão:** Detalhe do pacote — dados acima, produção lançada (data, quantidade, atividade), funcionários com dias de presença no pacote e, se fechado, o prêmio de cada um (Eng/Coord).
 
 **Regras por perfil**
-- Mestre: só leitura e sem o valor do prêmio nem os prêmios por funcionário.
+- Mestre: só leitura (vê o pacote pausado e o problema) e sem o valor do prêmio nem os prêmios por funcionário.
 
 **Estado vazio**
 "Nenhum pacote ainda. Crie o primeiro a partir de um serviço do cronograma."
@@ -345,7 +353,7 @@ Histórico: "Nenhuma produção lançada neste serviço."
 
 **Ações**
 - **Confirmar fechamento:** fecha e trava os pacotes; mostra "4 pacotes fechados · R$ 6.200,00 em prêmios" e o botão **Baixar planilha (Excel)**.
-- **Baixar planilha:** disponível também depois, no Detalhe de cada pacote fechado e numa lista "Fechamentos anteriores".
+- **Baixar planilha:** arquivo .csv que abre no Excel (separador ";", vírgula decimal). Disponível também depois, no Detalhe de cada pacote fechado e numa lista "Fechamentos anteriores".
 
 **Estado vazio**
 "Nenhum pacote para fechar até esta data."

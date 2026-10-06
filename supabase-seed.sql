@@ -79,17 +79,41 @@ insert into public.funcionarios (id,obra_id,nome,funcao,tipo_mao_obra,empresa,ma
 (116,1,'Cícero Nascimento','Eletricista','Terceirizada','Eletro Barra Instalações Ltda',null,true),
 (117,1,'Fábio Teixeira','Eletricista','Terceirizada','Eletro Barra Instalações Ltda',null,true);
 
-insert into public.pacotes (id,obra_id,servico_id,nome,local,quantidade_meta,quantidade_executada,valor_premio,data_inicio,data_fechamento,status,motivo_nao_conclusao,fechado_em) values
-(1,1,23,'Rede de água Fase 01 – Quadras A a D','Quadras A a D',1200,1200,2400,'2026-09-01','2026-09-20','Concluído',null,'2026-09-20T17:00:00'),
-(2,1,22,'Galeria Rua 1','Rua 1',300,210,1300,'2026-09-01','2026-09-20','Não concluído','Chuva','2026-09-20T17:00:00'),
-(3,1,22,'Galeria Rua 2 – trecho 1','Rua 2, Quadra B',400,260,1800,'2026-09-21','2026-10-20','Em execução',null,null),
-(4,1,23,'Rede de água Fase 01 – Quadras E e F','Quadras E e F',800,640,1600,'2026-09-21','2026-10-20','Em execução',null,null),
-(5,1,24,'Esgoto Rua 5 – lado ímpar','Rua 5',350,40,1500,'2026-10-05','2026-10-20','Liberado',null,null),
-(6,1,25,'Meio-fio Rua 1','Rua 1',8,0,1200,'2026-10-12','2026-11-20','Planejado',null,null);
+insert into public.pacotes (id,obra_id,nome,local,data_inicio,data_fechamento,status,motivo_nao_conclusao,fechado_em,pct_pago,continua,renovado_de_id) values
+(1,1,'Rede de água Fase 01 – Quadras A a D','Quadras A a D','2026-09-01','2026-09-20','Concluído',null,'2026-09-20T17:00:00',100,true,null),
+(2,1,'Galeria Rua 1','Rua 1','2026-09-01','2026-09-20','Não concluído','Chuva','2026-09-20T17:00:00',100,null,null),
+(3,1,'Galeria Rua 2 – trecho 1','Rua 2, Quadra B','2026-09-21','2026-10-20','Em execução',null,null,40,null,null),
+(4,1,'Rede de água Fase 01 – Quadras E e F','Quadras E e F','2026-09-21','2026-10-20','Em execução',null,null,40,null,1),
+(5,1,'Esgoto Rua 5 – lado ímpar','Rua 5','2026-10-05','2026-10-20','Liberado',null,null,40,null,null),
+(6,1,'Meio-fio Rua 1','Rua 1','2026-10-12','2026-11-20','Planejado',null,null,40,null,null);
+
+insert into public.pacote_servicos (id,obra_id,pacote_id,servico_id,quantidade_meta,meta_cronograma,quantidade_executada,mo_profissional,mo_ajudante) values
+(1,1,1,23,1200,null,1200,1600,800),
+(2,1,2,22,300,null,210,900,400),
+(3,1,3,22,400,null,260,1200,600),
+(4,1,4,23,800,null,640,1100,500),
+(5,1,5,24,350,null,40,1000,500),
+(6,1,6,25,8,null,0,800,400);
+
+insert into public.pacote_colaboradores (id,obra_id,pacote_id,funcionario_id) values
+(1,1,1,108),
+(2,1,1,109),
+(3,1,2,101),
+(4,1,2,105),
+(5,1,2,107),
+(6,1,3,101),
+(7,1,3,105),
+(8,1,3,107),
+(9,1,4,108),
+(10,1,4,109),
+(11,1,5,102),
+(12,1,5,106),
+(13,1,6,103),
+(14,1,6,104);
 
 insert into public.premios (id,pacote_id,funcionario_id,dias,valor) values
-(1,1,108,17,1200),
-(2,1,109,17,1200);
+(1,1,109,17,1600),
+(2,1,108,17,800);
 
 insert into public.pcp_atividades (id,obra_id,semana_inicio,data_prevista,servico_id,pacote_id,local,quantidade_planejada,equipe,status,equipe_executou,quantidade_executada,motivo_nao_conclusao,baixa_por,baixa_em,copiada_de_id) values
 (1,1,'2026-08-10','2026-08-10',21,null,'Quadra H',4,'Terraplan Delta','Concluída','Terraplan Delta',4,null,3,'2026-08-10T17:30:00',null),
@@ -234,6 +258,8 @@ select setval(pg_get_serial_sequence('public.servico_dependencias', 'id'), (sele
 select setval(pg_get_serial_sequence('public.restricoes', 'id'), (select max(id) from public.restricoes));
 select setval(pg_get_serial_sequence('public.funcionarios', 'id'), (select max(id) from public.funcionarios));
 select setval(pg_get_serial_sequence('public.pacotes', 'id'), (select max(id) from public.pacotes));
+select setval(pg_get_serial_sequence('public.pacote_servicos', 'id'), (select max(id) from public.pacote_servicos));
+select setval(pg_get_serial_sequence('public.pacote_colaboradores', 'id'), (select max(id) from public.pacote_colaboradores));
 select setval(pg_get_serial_sequence('public.premios', 'id'), (select max(id) from public.premios));
 select setval(pg_get_serial_sequence('public.pcp_atividades', 'id'), (select max(id) from public.pcp_atividades));
 select setval(pg_get_serial_sequence('public.producoes', 'id'), (select max(id) from public.producoes));

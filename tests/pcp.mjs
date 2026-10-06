@@ -1,5 +1,5 @@
 // PCP: resultado da baixa, PPC, janela do mestre, saldo, motivos.
-import { grupoDoMotivo, motivosPorGrupo, resultadoBaixa, mestrePodeAlterar, saldoPendente, contarMotivos, validarAtividade, previaBaixa, equipeDaAtividade, ppcPorSemana, restricaoVencida, copiarPendentes, validarRestricao, validarRemocao } from '../src/lib/pcp.js'
+import { grupoDoMotivo, motivosPorGrupo, resultadoBaixa, mestrePodeAlterar, saldoPendente, contarMotivos, validarAtividade, previaBaixa, equipeDaAtividade, ppcPorSemana, restricaoVencida, copiarPendentes, validarRestricao, validarRemocao, pacotesPara, ligarPacotes, opcoesDePacote, avisoPacoteDaBaixa } from '../src/lib/pcp.js'
 
 let ok = 0
 let tot = 0
@@ -59,21 +59,51 @@ conferir('serviço resumo recusa', validarAtividade(campos, { servico: { ...gale
 conferir('domingo fica fora da semana', validarAtividade({ ...campos, data_prevista: '2026-10-11' }, { servico: galeria, segunda: seg }).erro, 'Escolha um dia desta semana (segunda a sábado).')
 conferir('sem local recusa', validarAtividade({ ...campos, local: ' ' }, { servico: galeria, segunda: seg }).erro, 'Informe o local.')
 conferir('quantidade zero recusa', validarAtividade({ ...campos, quantidade_planejada: '0' }, { servico: galeria, segunda: seg }).erro, 'Informe a quantidade planejada.')
-conferir('pacote de outro serviço recusa', validarAtividade(campos, { servico: galeria, segunda: seg, pacote: { id: 6, servico_id: 25 } }).erro, 'Esse pacote não é deste serviço ou já foi fechado.')
+const pac = (id, servicos, extra = {}) => ({ id, nome: `P${id}`, status: 'Em execução', fechado_em: null, data_inicio: '2026-09-21', data_fechamento: '2026-10-20', servicos: servicos.map((servico_id) => ({ servico_id })), ...extra })
+const recusaPacote = 'Esse pacote não tem este serviço neste dia, está pausado ou já foi fechado.'
+conferir('pacote de outro serviço recusa', validarAtividade(campos, { servico: galeria, segunda: seg, pacote: pac(6, [25]) }).erro, recusaPacote)
 conferir('atividade nova num dia que já passou: recusa', validarAtividade({ ...campos, data_prevista: '2026-10-06' }, { servico: galeria, segunda: seg, hoje: '2026-10-07', nova: true }).erro, 'Não dá para planejar um dia que já passou.')
 conferir('editar atividade de um dia que já passou: pode', validarAtividade({ ...campos, data_prevista: '2026-10-06' }, { servico: galeria, segunda: seg, hoje: '2026-10-07', nova: false }).erro, undefined)
-conferir('pacote fechado recusa', validarAtividade(campos, { servico: galeria, segunda: seg, pacote: { id: 3, servico_id: 22, fechado_em: '2026-09-20' } }).erro, 'Esse pacote não é deste serviço ou já foi fechado.')
+conferir('pacote com o serviço entre outros: aceita', validarAtividade(campos, { servico: galeria, segunda: seg, pacote: pac(3, [27, 22]) }).registro.pacote_id, 3)
+conferir('pacote fechado recusa', validarAtividade(campos, { servico: galeria, segunda: seg, pacote: pac(3, [22], { fechado_em: '2026-09-20' }) }).erro, recusaPacote)
+conferir('pacote pausado recusa', validarAtividade(campos, { servico: galeria, segunda: seg, pacote: pac(3, [22], { status: 'Pausado' }) }).erro, recusaPacote)
+conferir('dia fora do período do pacote recusa', validarAtividade(campos, { servico: galeria, segunda: seg, pacote: pac(3, [22], { data_fechamento: '2026-10-06' }) }).erro, recusaPacote)
+
+// ── Pacote ligado sozinho ──
+const varios = [pac(3, [22]), pac(4, [22], { status: 'Pausado' }), pac(5, [22], { data_inicio: '2026-10-08' }), pac(6, [25]), pac(7, [22], { fechado_em: '2026-09-20' })]
+conferir('pacotes possíveis: aberto, não pausado, com o serviço e o dia no período', pacotesPara(varios, 22, '2026-10-07').map((p) => p.id), [3])
+conferir('dia 08: dois pacotes possíveis', pacotesPara(varios, 22, '2026-10-08').map((p) => p.id), [3, 5])
+conferir('sem pacote escolhido: entra sozinho no único possível', validarAtividade(campos, { servico: galeria, segunda: seg, pacotes: varios }).registro.pacote_id, 3)
+conferir('dois possíveis e nenhum escolhido: pede para escolher', validarAtividade({ ...campos, data_prevista: '2026-10-08' }, { servico: galeria, segunda: seg, pacotes: varios }).erro,
+  'Este serviço está em mais de um pacote neste dia: escolha o pacote.')
+conferir('dois possíveis e um escolhido: fica no escolhido', validarAtividade({ ...campos, data_prevista: '2026-10-08' }, { servico: galeria, segunda: seg, pacotes: varios, pacote: varios[2] }).registro.pacote_id, 5)
+conferir('nenhum pacote com o serviço: sem pacote', validarAtividade(campos, { servico: { ...galeria, id: 99 }, segunda: seg, pacotes: varios }).registro.pacote_id, null)
+const reg = (servico_id, data_prevista, pacote_id = null) => ({ servico_id, data_prevista, pacote_id })
+conferir('ligar vários: único, ambíguo e escolhido', ligarPacotes([reg(22, '2026-10-07'), reg(22, '2026-10-08'), reg(25, '2026-10-08')], varios),
+  { registros: [reg(22, '2026-10-07', 3), reg(22, '2026-10-08'), reg(25, '2026-10-08', 6)], ambiguos: [22] })
+conferir('ligar vários com escolha resolve o ambíguo', ligarPacotes([reg(22, '2026-10-08')], varios, { 22: '5' }).registros[0].pacote_id, 5)
+const pausadoDia7 = [pac(9, [26], { status: 'Pausado', pausa_desde: '2026-10-07' })]
+conferir('pacote pausado recebe só os dias antes da pausa (correção da revisão)', [pacotesPara(pausadoDia7, 26, '2026-10-06').length, pacotesPara(pausadoDia7, 26, '2026-10-07').length], [1, 0])
+conferir('campo Pacote: um possível vem escolhido', opcoesDePacote(varios, 22, '2026-10-07', '').pacoteId, 3)
+conferir('campo Pacote: dois possíveis e nada escolhido fica vazio', opcoesDePacote(varios, 22, '2026-10-08', '').pacoteId, '')
+conferir('campo Pacote: escolhido que não serve mais no dia é trocado', opcoesDePacote(varios, 22, '2026-10-07', '5').pacoteId, 3)
+conferir('campo Pacote: sem serviço, nada', opcoesDePacote(varios, undefined, '2026-10-07', '').possiveis, [])
+conferir('baixa de atividade sem pacote com dois possíveis: avisa', !!avisoPacoteDaBaixa({ pacote_id: null, servico_id: 22, data_prevista: '2026-10-08' }, varios), true)
+conferir('baixa com pacote ou com um possível: sem aviso', [avisoPacoteDaBaixa({ pacote_id: 3, servico_id: 22, data_prevista: '2026-10-08' }, varios), avisoPacoteDaBaixa({ pacote_id: null, servico_id: 22, data_prevista: '2026-10-07' }, varios)], [null, null])
+conferir('escolha que não serve naquele dia é ignorada', ligarPacotes([reg(22, '2026-10-07')], varios, { 22: 5 }).registros[0].pacote_id, 3)
 
 const semana = [
   { id: 1, semana_inicio: seg, data_prevista: '2026-10-06', servico_id: 22, local: 'Rua 2', quantidade_planejada: 60, quantidade_executada: 35, status: 'Não concluída', equipe: 'Eq. Raimundo', pacote_id: 3 },
   { id: 2, semana_inicio: seg, data_prevista: '2026-10-07', servico_id: 24, local: 'Rua 3', quantidade_planejada: 80, quantidade_executada: 80, status: 'Concluída', pacote_id: null },
   { id: 3, semana_inicio: seg, data_prevista: '2026-10-08', servico_id: 24, local: 'Rua 3', quantidade_planejada: 80, quantidade_executada: 0, status: 'Não concluída', pacote_id: 5 },
 ]
-const pacotesAbertos = [{ id: 3, fechado_em: null }, { id: 5, fechado_em: '2026-10-08' }]
+const pacotesAbertos = [pac(3, [22]), pac(5, [24], { fechado_em: '2026-10-08' })]
 const copias = copiarPendentes(semana, pacotesAbertos, seg, '2026-10-07')
 conferir('copia as duas não concluídas', copias.map((c) => c.copiada_de_id), [1, 3])
 conferir('cópia: mesmo dia da semana seguinte, com o saldo', copias[0], { semana_inicio: '2026-10-12', data_prevista: '2026-10-13', servico_id: 22, local: 'Rua 2', quantidade_planejada: 25, equipe: 'Eq. Raimundo', pacote_id: 3, copiada_de_id: 1 })
 conferir('cópia: pacote fechado fica de fora', copias[1].pacote_id, null)
+conferir('cópia: entra no pacote possível do novo dia', copiarPendentes(semana, [...pacotesAbertos, pac(8, [24])], seg, '2026-10-07')[1].pacote_id, 8)
+conferir('cópia: pacote que fecha antes do novo dia sai', copiarPendentes(semana, [pac(3, [22], { data_fechamento: '2026-10-10' })], seg, '2026-10-07')[0].pacote_id, null)
 conferir('cópia que cairia num dia passado não é criada', copiarPendentes(semana, pacotesAbertos, seg, '2026-10-14').map((c) => c.copiada_de_id), [3])
 conferir('não copia duas vezes', copiarPendentes([...semana, { id: 9, copiada_de_id: 1 }], pacotesAbertos, seg, '2026-10-07').map((c) => c.copiada_de_id), [3])
 

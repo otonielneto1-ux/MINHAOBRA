@@ -35,6 +35,8 @@ const tabelas = [
   ['restricoes', m.restricoes],
   ['funcionarios', m.funcionarios],
   ['pacotes', m.pacotes],
+  ['pacote_servicos', m.pacote_servicos],
+  ['pacote_colaboradores', m.pacote_colaboradores],
   ['premios', m.premios],
   ['pcp_atividades', m.pcp_atividades],
   ['producoes', m.producoes],

@@ -489,6 +489,16 @@ select.ipt { padding-right: 8px; }
 .tres-tabela th.hoje, .tres-tabela td.hoje { background: var(--primary-tint); }
 .tres-tabela tr.atrasada td.nome { box-shadow: inset 4px 0 0 var(--red); }
 
+/* Serviços dentro do pacote (meta + MO profissional, ajudante e total) */
+.item-pacote { border: 1px solid var(--line); padding: 10px; margin-bottom: 8px; background: var(--bg); }
+.item-pacote-campos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.item-pacote-campos label, .item-pacote-campos > div { display: flex; flex-direction: column; gap: 4px; }
+.ipt.editada { border-color: var(--amber); background: #FFF8EC; font-weight: 600; }
+.item-pacote .link { color: var(--primary); text-decoration: underline; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.pergunta-renovacao { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.mo-total { min-height: 48px; display: flex; align-items: center; font-weight: 600; font-size: 17px; }
+@media (max-width: 520px) { .item-pacote-campos { grid-template-columns: 1fr 1fr; } }
+
 /* Lista com caixa de marcar (distribuir na semana) */
 .marcar { cursor: pointer; }
 .marcar input { width: 22px; height: 22px; flex: none; accent-color: var(--primary); }

@@ -18,6 +18,7 @@ const srv = (id, eap, ini, fim, extra = {}) => ({
 })
 
 conferir('dias de trabalho de segunda a domingo = 6', diasUteisEntre('2026-10-05', '2026-10-11'), 6)
+conferir('segunda a sexta: 5 na semana', diasUteisEntre('2026-10-05', '2026-10-11', false), 5)
 conferir('dias de trabalho com fim antes do início = 0', diasUteisEntre('2026-10-10', '2026-10-05'), 0)
 
 // ── Linhas da semana ──

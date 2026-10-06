@@ -3,7 +3,7 @@
 // As datas foram pensadas com "hoje" = quarta, 07/10/2026.
 
 import { diasEntre, somarDias, diasDaSemana } from '../src/lib/datas.js'
-import { dividirPremio } from '../src/lib/premio.js'
+import { premioDoPacote } from '../src/lib/premio.js'
 
 const OBRA = 1
 
@@ -112,14 +112,32 @@ export const funcionarios = [
 
 // ── Pacotes ───────────────────────────────────────────────────────────────
 // quantidade_executada aqui = situação em 04/10; as baixas desta semana somam por cima.
+// Pacote: dados gerais. Os serviços (meta, MO profissional e ajudante) ficam em pacote_servicos e quem
+// participa, em pacote_colaboradores. quantidade_executada aqui = situação em 04/10; as baixas desta semana somam por cima.
+// pct_pago: % da MO orçada que vira prêmio. continua / renovado_de_id: a pergunta do dia 21 (o 1 foi renovado no 4; o 2 está sem resposta).
+const pac = (id, nome, local, data_inicio, data_fechamento, status, motivo = null, fechado_em = null, extra = {}) =>
+  ({ id, obra_id: OBRA, nome, local, data_inicio, data_fechamento, status, motivo_nao_conclusao: motivo, fechado_em, pct_pago: fechado_em ? 100 : 40, continua: null, renovado_de_id: null, ...extra })
 export const pacotes = [
-  { id: 1, obra_id: OBRA, servico_id: 23, nome: 'Rede de água Fase 01 – Quadras A a D', local: 'Quadras A a D', quantidade_meta: 1200, quantidade_executada: 1200, valor_premio: 2400, data_inicio: '2026-09-01', data_fechamento: '2026-09-20', status: 'Concluído', motivo_nao_conclusao: null, fechado_em: '2026-09-20T17:00:00' },
-  { id: 2, obra_id: OBRA, servico_id: 22, nome: 'Galeria Rua 1', local: 'Rua 1', quantidade_meta: 300, quantidade_executada: 210, valor_premio: 1300, data_inicio: '2026-09-01', data_fechamento: '2026-09-20', status: 'Não concluído', motivo_nao_conclusao: 'Chuva', fechado_em: '2026-09-20T17:00:00' },
-  { id: 3, obra_id: OBRA, servico_id: 22, nome: 'Galeria Rua 2 – trecho 1', local: 'Rua 2, Quadra B', quantidade_meta: 400, quantidade_executada: 136, valor_premio: 1800, data_inicio: '2026-09-21', data_fechamento: '2026-10-20', status: 'Em execução', motivo_nao_conclusao: null, fechado_em: null },
-  { id: 4, obra_id: OBRA, servico_id: 23, nome: 'Rede de água Fase 01 – Quadras E e F', local: 'Quadras E e F', quantidade_meta: 800, quantidade_executada: 640, valor_premio: 1600, data_inicio: '2026-09-21', data_fechamento: '2026-10-20', status: 'Em execução', motivo_nao_conclusao: null, fechado_em: null },
-  { id: 5, obra_id: OBRA, servico_id: 24, nome: 'Esgoto Rua 5 – lado ímpar', local: 'Rua 5', quantidade_meta: 350, quantidade_executada: 0, valor_premio: 1500, data_inicio: '2026-10-05', data_fechamento: '2026-10-20', status: 'Liberado', motivo_nao_conclusao: null, fechado_em: null },
-  { id: 6, obra_id: OBRA, servico_id: 25, nome: 'Meio-fio Rua 1', local: 'Rua 1', quantidade_meta: 8, quantidade_executada: 0, valor_premio: 1200, data_inicio: '2026-10-12', data_fechamento: '2026-11-20', status: 'Planejado', motivo_nao_conclusao: null, fechado_em: null },
+  pac(1, 'Rede de água Fase 01 – Quadras A a D', 'Quadras A a D', '2026-09-01', '2026-09-20', 'Concluído', null, '2026-09-20T17:00:00', { continua: true }),
+  pac(2, 'Galeria Rua 1', 'Rua 1', '2026-09-01', '2026-09-20', 'Não concluído', 'Chuva', '2026-09-20T17:00:00'),
+  pac(3, 'Galeria Rua 2 – trecho 1', 'Rua 2, Quadra B', '2026-09-21', '2026-10-20', 'Em execução'),
+  pac(4, 'Rede de água Fase 01 – Quadras E e F', 'Quadras E e F', '2026-09-21', '2026-10-20', 'Em execução', null, null, { renovado_de_id: 1 }),
+  pac(5, 'Esgoto Rua 5 – lado ímpar', 'Rua 5', '2026-10-05', '2026-10-20', 'Liberado'),
+  pac(6, 'Meio-fio Rua 1', 'Rua 1', '2026-10-12', '2026-11-20', 'Planejado'),
 ]
+
+// [pacote, serviço, meta, executada em 04/10, MO profissional, MO ajudante]
+export const pacote_servicos = [
+  [1, 23, 1200, 1200, 1600, 800], [2, 22, 300, 210, 900, 400], [3, 22, 400, 136, 1200, 600],
+  [4, 23, 800, 640, 1100, 500], [5, 24, 350, 0, 1000, 500], [6, 25, 8, 0, 800, 400],
+].map(([pacote_id, servico_id, quantidade_meta, quantidade_executada, mo_profissional, mo_ajudante], k) =>
+  ({ id: k + 1, obra_id: OBRA, pacote_id, servico_id, quantidade_meta, meta_cronograma: null, quantidade_executada, mo_profissional, mo_ajudante }))
+
+// Quem participa de cada pacote (só quem participa recebe e aparece no efetivo).
+export const pacote_colaboradores = [
+  [1, 108], [1, 109], [2, 101], [2, 105], [2, 107], [3, 101], [3, 105], [3, 107], [4, 108], [4, 109],
+  [5, 102], [5, 106], [6, 103], [6, 104],
+].map(([pacote_id, funcionario_id], k) => ({ id: k + 1, obra_id: OBRA, pacote_id, funcionario_id }))
 
 // ── PCP ───────────────────────────────────────────────────────────────────
 // [data, serviço, pacote, local, planejada, equipe, status, executada, motivo]
@@ -200,9 +218,9 @@ export const producoes = gerarProducoes()
 for (const s of servicos) {
   s.quantidade_executada = Math.round(producoes.filter((p) => p.servico_id === s.id).reduce((t, p) => t + p.quantidade, 0) * 1000) / 1000
 }
-for (const p of pacotes) {
-  if (p.fechado_em) continue
-  p.quantidade_executada += producoes.filter((x) => x.pacote_id === p.id && x.data >= '2026-10-05').reduce((t, x) => t + x.quantidade, 0)
+for (const p of pacote_servicos) {
+  if (pacotes.find((x) => x.id === p.pacote_id).fechado_em) continue
+  p.quantidade_executada += producoes.filter((x) => x.pacote_id === p.pacote_id && x.servico_id === p.servico_id && x.data >= '2026-10-05').reduce((t, x) => t + x.quantidade, 0)
 }
 
 // ── Efetivo ───────────────────────────────────────────────────────────────
@@ -241,15 +259,15 @@ function gerarPresencas() {
 
 export const presencas = gerarPresencas()
 
-// Prêmios do fechamento de 20/09 (só o pacote que bateu a meta paga).
+// Prêmios do fechamento de 20/09 (só o pacote que bateu a meta paga), pela mesma regra do app.
 export const premios = (() => {
-  const p = pacotes.find((x) => x.id === 1)
-  const dias = presencas
-    .filter((x) => x.pacote_id === 1 && x.situacao === 'Presente' && x.data >= p.data_inicio && x.data <= p.data_fechamento)
-    .map((x) => ({ funcionario_id: x.funcionario_id, tipo_mao_obra: funcionarios.find((f) => f.id === x.funcionario_id).tipo_mao_obra }))
-  return dividirPremio(p.valor_premio, dias).map((l, i) => ({ id: i + 1, pacote_id: 1, ...l }))
+  const p = {
+    ...pacotes.find((x) => x.id === 1),
+    servicos: pacote_servicos.filter((x) => x.pacote_id === 1),
+    colaboradores: pacote_colaboradores.filter((x) => x.pacote_id === 1).map((x) => x.funcionario_id),
+  }
+  return premioDoPacote(p, presencas, funcionarios).linhas.map(({ funcionario_id, dias, valor }, i) => ({ id: i + 1, pacote_id: 1, funcionario_id, dias, valor }))
 })()
-
 // ── Ocorrências ───────────────────────────────────────────────────────────
 export const ocorrencias = [
   { id: 1, obra_id: OBRA, numero: 1, titulo: "Poça d'água na Rua 2 após chuva", local: 'Rua 2, Quadra B', etapa_entrega_id: 2, descricao: 'Depois da chuva de segunda, a água ficou parada em frente aos lotes 3 a 6. Parece que a boca de lobo está entupida.', status: 'Aberta', aberta_por: 4, responsavel_id: null, prazo: null, resposta: null, aberta_em: '2026-10-01', respondida_em: null, fechada_em: null },

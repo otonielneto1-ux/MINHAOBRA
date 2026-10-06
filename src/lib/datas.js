@@ -100,9 +100,13 @@ export function dataHoraBr(ts) {
   return new Date(ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', '')
 }
 
-// Dias de trabalho (segunda a sábado) de `de` até `ate`, contando os dois. 0 se `ate` vem antes.
-export function diasUteisEntre(de, ate) {
+// Dias de trabalho de `de` até `ate`, contando os dois. 0 se `ate` vem antes.
+// Padrão: segunda a sábado (semana de obra). comSabado = false: segunda a sexta (meta e alertas do pacote).
+export function diasUteisEntre(de, ate, comSabado = true) {
   let n = 0
-  for (let x = de; x <= ate; x = somarDias(x, 1)) if (paraData(x).getDay() !== 0) n++
+  for (let x = de; x <= ate; x = somarDias(x, 1)) {
+    const dia = paraData(x).getDay()
+    if (dia !== 0 && (comSabado || dia !== 6)) n++
+  }
   return n
 }

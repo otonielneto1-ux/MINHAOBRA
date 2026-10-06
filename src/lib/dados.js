@@ -10,10 +10,11 @@ import { paraIso, mesesEntre } from './datas.js'
 import { pode } from './permissoes.js'
 import { resultadoBaixa } from './pcp.js'
 import { calcularCronograma } from './cronograma.js'
+import { premioReal, valoresDoPacote } from './premio.js'
 import { resumoAvanco, curvaS } from './avanco.js'
 import { servicosAtrasados } from './alertas.js'
 import { tipoDeImagemValido } from './imagem.js'
-import { ORIGEM_PRODUCAO, STATUS_PCP } from './vocabulario.js'
+import { ORIGEM_PRODUCAO, PACOTE, STATUS_PCP } from './vocabulario.js'
 
 let obraAtualId = null
 let usuarioAtual = null
@@ -35,6 +36,7 @@ async function q(consulta) {
   if (!error) return { data, erro: null }
   if (error.code === 'P0001') return falha(error.message)
   if (error.code === '42501') return falha('Seu perfil não pode fazer isso.')
+  if (error.code === '23503') return falha('Isso está ligado a outros registros e não pode ser excluído.')
   return falha('Não foi possível concluir. Verifique a conexão e tente de novo.')
 }
 
@@ -247,16 +249,83 @@ export async function excluirAtividade(id) {
 }
 
 // ── Pacotes ──────────────────────────────────────────────────────────────
-export const listarPacotes = () => (gestao()
-  ? q(supabase.from('pacotes').select('*').eq('obra_id', obraAtualId))
-  : q(supabase.rpc('pacotes_sem_premio', { p_obra: obraAtualId })))
-
-export async function buscarPacote(id) {
-  const r = await listarPacotes()
-  if (r.erro) return r
-  const p = r.data.find((x) => x.id === id)
-  return p ? { data: p, erro: null } : falha('Pacote não encontrado.')
+// Cada pacote vem com os seus serviços (meta e executado; MO, valor_orcado e valor_premio — o que será pago,
+// MO orçada × % — só para quem vê dinheiro)
+// e os ids dos colaboradores (entradas: { id: data } de quem entrou depois do início). O Mestre lê pelas funções do
+// banco que não devolvem MO.
+export async function listarPacotes() {
+  const [p, s, c] = await Promise.all([
+    gestao() ? q(supabase.from('pacotes').select('*').eq('obra_id', obraAtualId)) : q(supabase.rpc('pacotes_sem_premio', { p_obra: obraAtualId })),
+    gestao() ? q(supabase.from('pacote_servicos').select('*').eq('obra_id', obraAtualId)) : q(supabase.rpc('pacote_servicos_sem_mo', { p_obra: obraAtualId })),
+    q(supabase.from('pacote_colaboradores').select('pacote_id, funcionario_id, entrou_em, saiu_em, pct_saida').eq('obra_id', obraAtualId)),
+  ])
+  const erro = [p, s, c].find((x) => x.erro)?.erro
+  if (erro) return falha(erro)
+  return {
+    data: p.data.map((x) => {
+      const servicos = s.data.filter((y) => y.pacote_id === x.id)
+      const colab = c.data.filter((y) => y.pacote_id === x.id)
+      return {
+        ...x, servicos, colaboradores: colab.map((y) => y.funcionario_id),
+        entradas: Object.fromEntries(colab.filter((y) => y.entrou_em).map((y) => [y.funcionario_id, y.entrou_em])),
+        saidas: Object.fromEntries(colab.filter((y) => y.saiu_em).map((y) => [y.funcionario_id, { saiu_em: y.saiu_em, pct_saida: Number(y.pct_saida) }])),
+        ...(gestao() ? { valor_orcado: valoresDoPacote({ servicos }).total, valor_premio: premioReal({ ...x, servicos }).total } : {}),
+      }
+    }),
+    erro: null,
+  }
 }
+
+// Novo ou editado, com serviços e colaboradores, numa transação (função salvar_pacote). id null = novo.
+// v: o que validarPacote() de lib/premio.js devolve. Devolve { data: id do pacote }.
+export const salvarPacote = (id, v) => recusa('gerirPacotes', 'Seu perfil não salva pacote.')
+  ?? q(supabase.rpc('salvar_pacote', { p_obra: obraAtualId, p_id: id ?? null, p_pacote: v.registro, p_servicos: v.itens, p_colaboradores: v.colaboradores }))
+
+// Pergunta do dia 21: o pacote continua no período seguinte? "Sim" é a renovação (salvarPacote com
+// renovado_de_id marca sozinho); aqui fica o "Não".
+export const marcarRenovacao = (id, continua) => recusa('gerirPacotes', 'Seu perfil não decide a renovação.')
+  ?? q(supabase.rpc('marcar_renovacao', { p_pacote: id, p_continua: continua }))
+
+// Pausar o pacote inteiro com o problema (motivo) e a data; retomar; levar colaboradores para outro pacote a partir
+// de uma data (quem entra depois do início recebe proporcional aos dias). Só Engenheiro e Coordenador.
+// troca: validarRemanejo() de lib/premio.js ou null — vai na mesma transação da pausa.
+export const pausarPacote = (id, motivo, data, troca = null) => recusa('pausarPacote', 'Seu perfil não pausa pacote.')
+  ?? q(supabase.rpc('pausar_pacote', {
+    p_pacote: id, p_motivo: motivo, p_data: data,
+    p_destino: troca?.destino ?? null, p_funcionarios: troca?.colaboradores ?? null, p_entrada: troca?.data ?? null,
+  }))
+export const retomarPacote = (id) => recusa('pausarPacote', 'Seu perfil não retoma pacote.')
+  ?? q(supabase.rpc('retomar_pacote', { p_pacote: id }))
+// origemId: o pacote pausado de onde a equipe sai (quem sai leva o % da meta atingida).
+export const remanejarColaboradores = (destinoId, funcionarios, data, origemId) => recusa('pausarPacote', 'Seu perfil não troca colaborador de pacote.')
+  ?? q(supabase.rpc('remanejar_colaboradores', { p_destino: destinoId, p_funcionarios: funcionarios, p_data: data, p_origem: origemId }))
+
+// Só o status (Mudar status); excluir só o Engenheiro e só Planejado.
+export async function editarPacote(id, campos) {
+  if (!pode(role(), 'gerirPacotes')) return falha('Seu perfil não edita pacote.')
+  const r = await q(supabase.from('pacotes').update(campos).eq('id', id).eq('obra_id', obraAtualId).is('fechado_em', null).select('id'))
+  return r.erro || r.data.length ? r : falha('Pacote fechado na folha não pode ser editado.')
+}
+
+export async function excluirPacote(id) {
+  if (!pode(role(), 'apagar')) return falha('Só o engenheiro exclui pacote.')
+  const r = await q(supabase.from('pacotes').delete().eq('id', id).eq('obra_id', obraAtualId).eq('status', PACOTE.PLANEJADO).select('id'))
+  return r.erro || r.data.length ? r : falha('Só dá para excluir pacote Planejado.')
+}
+
+// Fechamento da folha: o banco refaz a conta do prêmio e grava tudo de uma vez (função fechar_pacotes).
+// motivos: { [id do pacote]: causa } para os que não bateram a meta.
+export const fecharPacotes = (data, motivos) => recusa('fecharFolha', 'Seu perfil não fecha pacotes.')
+  ?? q(supabase.rpc('fechar_pacotes', { p_obra: obraAtualId, p_data: data, p_motivos: motivos }))
+
+// Ajuste do prêmio por funcionário e data da folha (só Engenheiro e Coordenador). registro: validarAjustePremio().
+export const listarAjustesPremio = () => (pode(role(), 'verPremio')
+  ? q(supabase.from('premio_ajustes').select('*').eq('obra_id', obraAtualId).order('created_at'))
+  : Promise.resolve({ data: [], erro: null }))
+export const criarAjustePremio = (registro) => recusa('gerirPacotes', 'Seu perfil não lança ajuste de prêmio.')
+  ?? q(supabase.from('premio_ajustes').insert({ ...registro, obra_id: obraAtualId, criado_por: usuarioAtual.id }))
+export const excluirAjustePremio = (id) => recusa('gerirPacotes', 'Seu perfil não exclui ajuste de prêmio.')
+  ?? q(supabase.from('premio_ajustes').delete().eq('id', id).eq('obra_id', obraAtualId))
 
 export async function listarPremios({ pacoteId } = {}) {
   if (!pode(role(), 'verPremio')) return { data: [], erro: null }

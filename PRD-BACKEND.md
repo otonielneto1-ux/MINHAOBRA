@@ -29,7 +29,7 @@
 | `funcionarios.funcao` | Servente, Pedreiro, Carpinteiro, Armador, Encanador, Eletricista, Operador de máquina, Motorista, Encarregado, Apontador, Almoxarife, Técnico, Outro |
 | `funcionarios.tipo_mao_obra` | Direta, Indireta, Terceirizada |
 | `presencas.situacao` | Presente, Falta, Atestado, Afastado |
-| `pacotes.status` | Planejado, Liberado, Em execução, Concluído, Não concluído |
+| `pacotes.status` | Planejado, Liberado, Em execução, Pausado, Concluído, Não concluído |
 | `pcp_atividades.status` | Planejada, Concluída, Não concluída |
 | motivo de não conclusão (`pacotes`, `pcp_atividades`) | a causa; o grupo macro sai dela (`GRUPOS_MOTIVO` em vocabulario.js): Condição climática (Chuva, Solo encharcado, Vento ou calor excessivo) · Execução (Falta de equipe, Baixa produtividade, Retrabalho) · Planejamento (Frente não liberada, Meta acima da capacidade, Interferência de outra equipe, Mudança de prioridade) · Projetos (Falta de projeto, Dúvida ou erro de projeto) · Suprimentos (Falta de material, Atraso na entrega de material, Equipamento (falta ou quebra)) · Segurança (Acidente ou incidente, Paralisação por segurança, Falta de EPI) · Outros (Outro) |
 | `producoes.origem` | PCP, Ajuste |
@@ -229,26 +229,75 @@ O efetivo: a situação de cada funcionário em cada dia.
 
 ## Tabela `pacotes`
 
-A meta de produção com prêmio até o fechamento da folha.
+A meta de produção com prêmio até o fechamento da folha. Os serviços, metas e MO ficam em `pacote_servicos`;
+quem participa, em `pacote_colaboradores`. Salvo (com serviços e colaboradores) pela função `salvar_pacote`.
 
 | Campo | Tipo | Obrigatório | Observação |
 |---|---|---|---|
 | obra_id | int8 | sim | → obras |
-| servico_id | int8 | sim | → servicos |
 | nome | text | sim | ex.: "Meio-fio Rua 4 – lado par" |
 | local | text | sim | |
-| quantidade_meta | numeric(14,3) | sim | maior que zero |
-| quantidade_executada | numeric(14,3) | sim | padrão 0; soma das `producoes` do pacote, mantida pelo banco |
-| valor_premio | numeric(14,2) | sim | **nunca chega ao Mestre** |
 | data_inicio | date | sim | |
-| data_fechamento | date | sim | data de fechamento da folha |
-| status | text | sim | CHECK: lista acima; padrão Planejado |
+| data_fechamento | date | sim | data de fechamento da folha; não antes do início |
+| status | text | sim | CHECK: lista acima; padrão Planejado. À mão só Planejado, Liberado, Em execução; Pausado só pela função `pausar_pacote` |
 | motivo_nao_conclusao | text | não | CHECK: lista de motivos; obrigatório quando Não concluído |
 | fechado_em | timestamptz | não | preenchido pelo fechamento da folha |
+| pct_pago | numeric(5,2) | sim | padrão 100; de >0 a 100; prêmio pago = MO orçada × pct_pago |
+| continua | boolean | não | resposta da pergunta do dia 21 (null = sem resposta); muda pela função `marcar_renovacao` |
+| renovado_de_id | int8 | não | → pacotes: o pacote do período anterior que este renova |
+| pausa_motivo | text | não | CHECK: lista de motivos; obrigatório quando Pausado (o problema) |
+| pausa_desde | date | não | obrigatório quando Pausado; do início do pacote até hoje. Fora de Pausado só fica preenchido depois de fechado (CHECK) |
+| pausado_por | int8 | não | → profiles: quem pausou |
 
-**Regra:** pacote com `fechado_em` preenchido não pode mais ser editado.
+**Regra:** pacote com `fechado_em` preenchido não pode mais ser editado; Concluído / Não concluído só pelo fechamento.
 
 ---
+
+## Tabela `pacote_servicos`
+
+Os serviços de cada pacote (decidido em 05/10/2026: pacote com vários serviços). Leitura com MO só para Engenheiro e
+Coordenador; o Mestre lê pela função `pacote_servicos_sem_mo`.
+
+| Campo | Tipo | Obrigatório | Observação |
+|---|---|---|---|
+| obra_id | int8 | sim | → obras |
+| pacote_id | int8 | sim | → pacotes (apaga junto) |
+| servico_id | int8 | sim | → servicos (não resumo, da mesma obra); único por pacote |
+| quantidade_meta | numeric(14,3) | sim | maior que zero |
+| quantidade_executada | numeric(14,3) | sim | padrão 0; soma das `producoes` do pacote neste serviço, mantida pelo banco |
+| mo_profissional | numeric(14,2) | sim | padrão 0; não negativo |
+| mo_ajudante | numeric(14,2) | sim | padrão 0; não negativo |
+| mo_total | numeric(14,2) | — | calculado pelo banco: mo_profissional + mo_ajudante (valores de orçamento) |
+| meta_cronograma | numeric(14,3) | não | meta sugerida pelo cronograma quando o pacote foi salvo; diferente de quantidade_meta = meta editada |
+
+## Tabela `pacote_colaboradores`
+
+Quem participa do pacote: só eles recebem o prêmio e só para eles o efetivo aceita o pacote.
+
+| Campo | Tipo | Obrigatório | Observação |
+|---|---|---|---|
+| obra_id | int8 | sim | → obras |
+| pacote_id | int8 | sim | → pacotes (apaga junto) |
+| funcionario_id | int8 | sim | → funcionarios (da mesma obra, não terceirizado); único por pacote |
+| entrou_em | date | não | null = desde o início; com data depois do início, recebe proporcional aos dias úteis |
+| saiu_em | date | não | levado do pacote pausado para outro (função `remanejar_colaboradores` com origem) |
+| pct_saida | numeric(5,2) | não | % da meta atingida na saída (junto com saiu_em); recebe a parte cheia × este %, garantido |
+
+**Regra:** quem saiu não é apagado ao editar o pacote nem vai na renovação; `saiu_em`/`pct_saida` só pela função. Pausar com data no passado tira do pacote as baixas do dia da pausa em diante (antes de calcular o % de quem sai); retomar liga de volta as atividades sem pacote.
+
+## Tabela `premio_ajustes`
+
+Acréscimo ou desconto no prêmio de um funcionário numa folha (aba Resumo). Só Engenheiro e Coordenador veem, lançam e
+excluem; não se edita (exclui e lança de novo). Entra na planilha da folha da `data_folha`.
+
+| Campo | Tipo | Obrigatório | Observação |
+|---|---|---|---|
+| obra_id | int8 | sim | → obras |
+| funcionario_id | int8 | sim | → funcionarios (da mesma obra) |
+| data_folha | date | sim | data de fechamento da folha a que o ajuste pertence |
+| valor | numeric(14,2) | sim | diferente de zero; negativo = desconto |
+| motivo | text | sim | |
+| criado_por | int8 | sim | → profiles: quem lançou |
 
 ## Tabela `premios`
 
@@ -406,11 +455,15 @@ Permissão de linha não esconde coluna. Por isso:
 ### `pacotes`
 - **Ver:** Engenheiro e Coordenador (tudo); Mestre pela visão sem valor.
 - **Criar / editar:** Engenheiro e Coordenador, enquanto não fechado.
+- **Pausar / retomar / levar a equipe para outro pacote:** Engenheiro e Coordenador, pelas funções `pausar_pacote`, `retomar_pacote` e `remanejar_colaboradores`.
 - **Apagar:** Engenheiro, só com status Planejado.
 
 ### `premios`
 - **Ver:** Engenheiro e Coordenador.
 - **Criar / editar / apagar:** só o processo de fechamento.
+
+### `premio_ajustes`
+- **Ver / criar / apagar:** Engenheiro e Coordenador. Editar: ninguém.
 
 ### `pcp_atividades`
 - **Ver:** Engenheiro, Coordenador, Mestre, Técnico de Segurança.
@@ -454,12 +507,16 @@ Permissão de linha não esconde coluna. Por isso:
 - **Resultado:** críticos e atrasos atualizados; alertas no Painel.
 - **Se falhar:** dependência circular ou serviço sem data → nada é gravado; a tela lista os serviços com problema; o cálculo anterior continua valendo.
 
+### Atividade da semana → pacote
+- **Regra:** o pacote que recebe a produção de um serviço num dia é o único pacote aberto, com o serviço, com o dia no período e — se pausado — com o dia **antes** da pausa (`pacote_unico` / `pacote_para`; em `src/lib/pcp.js`, `pacotesPara` / `ligarPacotes`). O pacote que a atividade já tem só vale enquanto for possível naquele dia. Com dois possíveis, a tela pede para escolher (e a baixa avisa que não vai somar em nenhum).
+- **Quando:** ao criar a atividade (tela), em toda baixa (`dar_baixa`) e ao salvar um pacote (`ligar_baixas_ao_pacote`: o que ficou fora do novo período sai dele, e as atividades e produções do período sem pacote passam para ele; o gatilho refaz o executado). Produção de Ajuste (correção de medição) não entra em pacote.
+
 ### Fechamento dos pacotes na folha
 - **Gatilho:** botão "Fechar pacotes do mês" (Engenheiro ou Coordenador), com a data de fechamento escolhida.
 - **Passos:**
   1. Pega os pacotes não fechados com `data_fechamento` até a data escolhida.
-  2. `quantidade_executada` ≥ `quantidade_meta` → Concluído; senão Não concluído (motivo obrigatório antes de confirmar).
-  3. Para cada Concluído: conta os dias de `presencas` com situação Presente e aquele `pacote_id`, entre `data_inicio` e `data_fechamento`, só de funcionários Direta ou Indireta; divide `valor_premio` proporcionalmente; o centavo que sobrar vai para quem tem mais dias; grava `premios`.
+  2. Todos os serviços do pacote com `quantidade_executada` ≥ `quantidade_meta` → Concluído (paga 100%); senão, se **Pausado** → Não concluído com o problema da pausa e paga o **% executado** (média dos serviços, cada um até 100%, 2 casas); senão Não concluído (motivo obrigatório antes de confirmar), sem prêmio.
+  3. Para cada pacote que paga: cada parte (centavos) = round(MO orçada × `pct_pago` × % ÷ 100), a profissional para os **colaboradores** profissionais e a ajudante para os serventes (nunca terceirizado). Quem entrou depois do início (`entrou_em`) recebe round(parte × dias úteis dele ÷ (dias úteis do pacote × n)); quem saiu do pacote pausado (`saiu_em`) recebe round(parte cheia (100%) × dias úteis dele × `pct_saida` ÷ (dias úteis do pacote × n × 100)), **mesmo que o pacote não pague**; o resto (mínimo 0) vai **em partes iguais** para quem está desde o início e ficou (se ninguém, para quem ficou; se ninguém ficou, para quem saiu); os centavos que sobrarem vão um para cada, a partir do menor id; grava `premios` (com os dias de presença no pacote no período, só como informação). Parte com valor e sem nenhum colaborador daquela parte → o fechamento para e diz qual.
   4. Marca `fechado_em` em todos.
   5. Gera o Excel: funcionário, matrícula, função, pacote, dias, valor; total por funcionário.
 - **Resultado:** pacotes travados e planilha para a folha.

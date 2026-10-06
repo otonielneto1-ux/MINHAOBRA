@@ -51,7 +51,14 @@ testada simulando cada perfil — ver `supabase/migrations/20261005-02-acesso.sq
   tirado do banco). Snapshot velho passa verde mentindo.
 - **Baixa do PCP passa pela função `dar_baixa`** (confere a regra e grava a produção). A mesma regra
   existe em `src/lib/pcp.js` para a mensagem rápida: mudou uma, mude a outra.
-- **Quantidade executada** de serviços e pacotes abertos é mantida por gatilho a partir de `producoes`.
+- **Fechamento da folha passa pela função `fechar_pacotes`** (fecha, divide o prêmio e trava tudo de uma vez). A
+  mesma conta existe em `src/lib/premio.js` (`premioDoPacote` / `dividirParte`: orçado × % × % executado se pausado, partes iguais, quem entrou depois proporcional aos dias, quem saiu do pausado com o % da saída garantido) para a prévia: mudou uma, mude a outra. O pacote tem
+  vários serviços (`pacote_servicos`, com MO profissional/ajudante) e colaboradores (`pacote_colaboradores`); é salvo
+  inteiro pela função `salvar_pacote`. "Servente" = ajudante (`FUNCOES_AJUDANTE`), igual no banco e na lib. Status Concluído / Não
+  concluído e `fechado_em` só saem dali; à mão o pacote só anda entre Planejado, Liberado e Em execução.
+- **Quantidade executada** de serviços e pacotes abertos é mantida por gatilho a partir de `producoes`. A atividade da semana
+  entra sozinha no pacote único possível: `pacote_unico` / `pacote_para` no banco ↔ `pacotesPara` / `ligarPacotes` em `src/lib/pcp.js`
+  (mudou uma, mude a outra). Dinheiro na lib é conta em inteiros (BigInt) para arredondar igual ao `numeric` do banco.
 - **Caminho crítico** é calculado em `src/lib/cronograma.js` (com teste) e gravado de uma vez pela função
   `gravar_calculo`. Importação do Project, custos em lote e troca de % por quantidade também são funções
   do banco (`importar_cronograma`, `salvar_custos`, `trocar_unidade`): tudo ou nada, nunca metade.

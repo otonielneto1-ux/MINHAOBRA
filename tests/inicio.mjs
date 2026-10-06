@@ -1,7 +1,7 @@
 // Regras do Início: PPC da semana e do mês, ocorrências do cliente em destaque.
 import { ppcAte, ppcDoMes, tomPpc } from '../src/lib/pcp.js'
 import { nomeMes, inicioDoMesAnterior } from '../src/lib/datas.js'
-import { ocorrenciasDoCliente, montarAlertas, contarCriticos } from '../src/lib/alertas.js'
+import { ocorrenciasDoCliente, montarAlertas, contarCriticos, metaEmRisco } from '../src/lib/alertas.js'
 
 let ok = 0
 let tot = 0
@@ -72,6 +72,21 @@ conferir('ocorrência do cliente não se repete na lista geral', alertas.some((a
 conferir('ocorrência aberta pelo engenheiro continua na lista geral quando atrasa',
   montarAlertas({ servicos: [], pacotes: [], restricoes: [], ocorrencias: [oc(7, 'Aberta', '2026-10-01', 1)], pessoas, efetivoLancado: true, hoje: HOJE }).length, 1)
 conferir('críticos = vermelhos da lista + ocorrências do cliente urgentes', contarCriticos([{ nivel: 'crit' }, { nivel: 'warn' }], destaque), 3)
+
+// Pacote perto do fechamento e abaixo de 70% (média dos serviços do pacote, cada um até 100%).
+const pacoteAlerta = (fecha, execs, extra = {}) => ({ id: 9, nome: 'Galeria', status: 'Em execução', fechado_em: null, data_fechamento: fecha,
+  servicos: execs.map(([meta, exec], i) => ({ servico_id: i + 1, quantidade_meta: meta, quantidade_executada: exec })), ...extra })
+const alertaDe = (p) => montarAlertas({ servicos: [], pacotes: [p], restricoes: [], ocorrencias: [], pessoas, efetivoLancado: true, hoje: HOJE })
+conferir('pacote a 2 dias úteis com 50%: urgente, decidir se continua', alertaDe(pacoteAlerta('2026-10-10', [[100, 80], [100, 20]])).map((x) => [x.nivel, x.detalhe]), [['crit', 'fecha em 2 dias úteis · 50% da meta · decidir se continua no próximo período']])
+conferir('pacote a 7 dias úteis: aviso de decidir', alertaDe(pacoteAlerta('2026-10-16', [[100, 100], [100, 50]])).map((x) => [x.nivel, x.detalhe]), [['warn', 'fecha em 7 dias úteis · 75% da meta · decidir se continua no próximo período']])
+conferir('pacote a 8 dias úteis e meta ok: sem alerta', alertaDe(pacoteAlerta('2026-10-19', [[100, 100], [100, 50]])).length, 0)
+conferir('dia 21: fechamento passou sem resposta, pergunta se continua', alertaDe(pacoteAlerta('2026-10-06', [[100, 100]], { fechado_em: '2026-10-06T17:00:00', continua: null })).map((x) => x.detalhe), ['fechamento 06/10/2026 · continua no próximo período?'])
+conferir('já respondido: sem pergunta', alertaDe(pacoteAlerta('2026-10-06', [[100, 100]], { fechado_em: '2026-10-06T17:00:00', continua: false })).length, 0)
+conferir('pacote fechado: sem alerta', alertaDe(pacoteAlerta('2026-10-10', [[100, 0]], { fechado_em: '2026-10-07T10:00:00' })).length, 0)
+conferir('pacote pausado: alerta com o problema', alertaDe(pacoteAlerta('2026-10-20', [[100, 10]], { status: 'Pausado', pausa_desde: '2026-10-05', pausa_motivo: 'Chuva' })).map((x) => [x.titulo, x.detalhe]),
+  [['Pacote Galeria pausado', 'desde 05/10/2026 · Chuva']])
+conferir('meta em risco: abaixo de 70% a menos de 5 dias', [metaEmRisco(pacoteAlerta('2026-10-10', [[100, 60]]), HOJE), metaEmRisco(pacoteAlerta('2026-10-10', [[100, 80]]), HOJE), metaEmRisco(pacoteAlerta('2026-10-20', [[100, 10]]), HOJE)],
+  [true, false, false])
 
 console.log(`${ok}/${tot} — início`)
 process.exit(ok === tot ? 0 : 1)

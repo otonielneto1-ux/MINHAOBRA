@@ -6,7 +6,7 @@ import * as dados from '../lib/dados.js'
 import { pode } from '../lib/permissoes.js'
 import { mestrePodeAlterar } from '../lib/pcp.js'
 import { dataBr, nomeDia, somarDias } from '../lib/datas.js'
-import { PERFIS, SITUACOES, TIPOS_MAO_OBRA } from '../lib/vocabulario.js'
+import { PACOTE, PERFIS, SITUACOES, TIPOS_MAO_OBRA } from '../lib/vocabulario.js'
 import { Abas, Cabecalho, Carregando, ErroCaixa, Folha, Icone, Vazio, useAviso, useCarga } from '../components/index.jsx'
 
 const NOME_GRUPO = { Direta: 'Mão de obra direta', Indireta: 'Mão de obra indireta', Terceirizada: 'Terceirizada' }
@@ -22,7 +22,7 @@ async function carregar(data) {
   const erro = r.find((x) => x.erro)?.erro
   if (erro) return { data: null, erro }
   const [funcionarios, doDia, deOntem, pacotes] = r.map((x) => x.data)
-  return { data: { funcionarios, doDia, deOntem, pacotes: pacotes.filter((p) => ['Liberado', 'Em execução'].includes(p.status)) }, erro: null }
+  return { data: { funcionarios, doDia, deOntem, pacotes: pacotes.filter((p) => [PACOTE.LIBERADO, PACOTE.EM_EXECUCAO].includes(p.status)) }, erro: null }
 }
 
 export default function Efetivo({ goto, usuario }) {
@@ -83,7 +83,7 @@ function EfetivoDia({ data, pedirData, onSujo, usuario, goto }) {
     for (const p of base.deOntem) {
       if (novo[p.funcionario_id]) continue
       if (!base.funcionarios.some((f) => f.id === p.funcionario_id)) continue
-      novo[p.funcionario_id] = { situacao: p.situacao, pacote_id: base.pacotes.some((x) => x.id === p.pacote_id) ? p.pacote_id : null }
+      novo[p.funcionario_id] = { situacao: p.situacao, pacote_id: base.pacotes.some((x) => x.id === p.pacote_id && x.colaboradores.includes(p.funcionario_id)) ? p.pacote_id : null }
       n++
     }
     setRascunho(novo)
@@ -142,7 +142,7 @@ function EfetivoDia({ data, pedirData, onSujo, usuario, goto }) {
                     disabled={!editavel || m?.situacao !== 'Presente' || t === 'Terceirizada'}
                     onChange={(e) => marcar(f.id, { pacote_id: e.target.value ? Number(e.target.value) : null })}>
                     <option value="">{t === 'Terceirizada' ? 'Terceirizado — sem pacote' : 'Sem pacote'}</option>
-                    {base.pacotes.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                    {base.pacotes.filter((p) => p.colaboradores.includes(f.id)).map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
                   </select>
                 </div>
               )

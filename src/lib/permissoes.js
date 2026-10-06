@@ -20,6 +20,7 @@ const MATRIZ = {
   darBaixa: [...GESTAO, MESTRE],
   verPacotes: [...GESTAO, MESTRE],
   gerirPacotes: GESTAO,
+  pausarPacote: GESTAO, // pausar, retomar e levar a equipe para outro pacote (pausado paga proporcional)
   fecharFolha: GESTAO,
   lancarEfetivo: [...GESTAO, MESTRE],
   verOcorrencias: [...GESTAO, CLIENTE],

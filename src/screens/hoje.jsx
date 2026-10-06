@@ -88,7 +88,7 @@ export default function Hoje({ goto, usuario }) {
         </div>
       </Secao>
 
-      <JanelaBaixa atividade={baixa} servico={baixa && servico(baixa.servico_id)} fechar={() => setBaixa(null)}
+      <JanelaBaixa atividade={baixa} servico={baixa && servico(baixa.servico_id)} pacotes={data.pacotes} fechar={() => setBaixa(null)}
         salvo={(msg) => { setBaixa(null); aviso(msg); recarregar() }} />
     </>
   )

@@ -1,19 +1,28 @@
 // Alertas do Painel do dia (PLANO-DO-PROJETO.md, "1. Painel do dia").
 // Limites provisórios — "Decidir depois de usar".
 
-import { diasEntre } from './datas.js'
+import { dataBr, diasEntre } from './datas.js'
 import { avancoServico, diasAtraso, servicosMedidos } from './avanco.js'
-import { OCORRENCIA_ABERTA, PERFIS, STATUS_OCORRENCIA_ABERTOS } from './vocabulario.js'
+import { OCORRENCIA_ABERTA, PACOTE, PERFIS, STATUS_OCORRENCIA_ABERTOS, STATUS_PACOTE_MANUAL, STATUS_RESTRICAO } from './vocabulario.js'
+import { diasUteisAteFechamento, pctPacote, renovacoesPendentes } from './premio.js'
 
 const idsDeClientes = (pessoas) => new Set(pessoas.filter((p) => p.role === PERFIS.CLIENTE).map((p) => p.id))
 
 export const LIMITES = {
   pacoteDiasAntesDoFechamento: 5,
   pacotePctMinimo: 70,
+  // Aviso de fechamento / decisão de renovar: com 7 dias úteis (seg–sex) e, mais forte, com 3.
+  pacoteDiasUteisAviso: 7,
+  pacoteDiasUteisUrgente: 3,
   ocorrenciaHorasSemResposta: 48,
 }
 
-const PACOTE_ABERTO = ['Planejado', 'Liberado', 'Em execução']
+
+// Meta do pacote aberto em risco: abaixo de 70% a menos de 5 dias do fechamento (quadro de Pacotes e alerta).
+export const metaEmRisco = (p, hoje) => {
+  const faltam = diasEntre(hoje, p.data_fechamento)
+  return !p.fechado_em && faltam >= 0 && faltam < LIMITES.pacoteDiasAntesDoFechamento && pctPacote(p) < LIMITES.pacotePctMinimo
+}
 
 // Lista geral de alertas. Ocorrências abertas pelo cliente ficam de fora: elas vão no
 // grupo em destaque (ocorrenciasDoCliente), para não aparecerem duas vezes.
@@ -33,22 +42,46 @@ export function montarAlertas({ servicos, pacotes, restricoes, ocorrencias, pess
     })
   }
 
+  // Pacote aberto perto do fechamento: aviso com 7 dias úteis, urgente com 3 (decidir se continua no
+  // período seguinte); e meta em risco (abaixo de 70% a menos de 5 dias). Um alerta só por pacote.
   for (const p of pacotes) {
-    if (!PACOTE_ABERTO.includes(p.status) || p.fechado_em) continue
-    const faltam = diasEntre(hoje, p.data_fechamento)
-    const pct = (Number(p.quantidade_executada) / Number(p.quantidade_meta)) * 100
-    if (faltam >= 0 && faltam < LIMITES.pacoteDiasAntesDoFechamento && pct < LIMITES.pacotePctMinimo) {
-      alertas.push({
-        nivel: 'warn',
-        titulo: `Pacote ${p.nome}`,
-        detalhe: `${Math.round(pct)}% da meta · fecha em ${faltam} ${faltam === 1 ? 'dia' : 'dias'}`,
-        destino: { screen: 'pacote', params: { id: p.id } },
-      })
-    }
+    if (!STATUS_PACOTE_MANUAL.includes(p.status) || p.fechado_em || p.data_fechamento < hoje) continue
+    const uteis = diasUteisAteFechamento(p, hoje)
+    const pct = pctPacote(p)
+    const perto = uteis <= LIMITES.pacoteDiasUteisAviso
+    const emRisco = metaEmRisco(p, hoje)
+    if (!perto && !emRisco) continue
+    alertas.push({
+      nivel: uteis <= LIMITES.pacoteDiasUteisUrgente ? 'crit' : 'warn',
+      titulo: `Pacote ${p.nome}`,
+      detalhe: [`fecha em ${uteis} ${uteis === 1 ? 'dia útil' : 'dias úteis'}`, `${Math.round(pct)}% da meta`, perto ? 'decidir se continua no próximo período' : null]
+        .filter(Boolean).join(' · '),
+      destino: { screen: 'pacote', params: { id: p.id } },
+    })
+  }
+
+  // Pacote pausado: lembra o problema até alguém retomar ou levar a equipe para outro pacote.
+  for (const p of pacotes.filter((x) => x.status === PACOTE.PAUSADO && !x.fechado_em)) {
+    alertas.push({
+      nivel: 'warn',
+      titulo: `Pacote ${p.nome} pausado`,
+      detalhe: `desde ${dataBr(p.pausa_desde)} · ${p.pausa_motivo}`,
+      destino: { screen: 'pacote', params: { id: p.id } },
+    })
+  }
+
+  // Dia 21 em diante: fechamento passou e ainda não se decidiu se o pacote continua.
+  for (const p of renovacoesPendentes(pacotes, hoje)) {
+    alertas.push({
+      nivel: 'warn',
+      titulo: `Pacote ${p.nome}`,
+      detalhe: `fechamento ${dataBr(p.data_fechamento)} · continua no próximo período?`,
+      destino: { screen: 'pacotes', params: {} },
+    })
   }
 
   for (const r of restricoes) {
-    if (r.status === 'Pendente' && r.data_limite && r.data_limite < hoje) {
+    if (r.status === STATUS_RESTRICAO.PENDENTE && r.data_limite && r.data_limite < hoje) {
       alertas.push({
         nivel: 'warn',
         titulo: r.descricao,

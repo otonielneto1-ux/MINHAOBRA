@@ -4,7 +4,7 @@
 
 import { useState } from 'react'
 import * as dados from '../lib/dados.js'
-import { CONFERENCIA_INICIO, conferenciaOk, distribuirNaSemana, precisaConferencia, validarAtividade } from '../lib/pcp.js'
+import { CONFERENCIA_INICIO, conferenciaOk, distribuirNaSemana, ligarPacotes, opcoesDePacote, precisaConferencia, validarAtividade } from '../lib/pcp.js'
 import { diasDaSemana, diaMes, nomeDia, somarDias } from '../lib/datas.js'
 import { arredondar, quantidade } from '../lib/formato.js'
 import { servicosMedidos } from '../lib/avanco.js'
@@ -65,7 +65,8 @@ export function FolhaAtividade({ aberta, segunda, hoje, servicos, pacotes, ativi
   const termo = busca.trim().toLowerCase()
   const opcoes = servicosMedidos(servicos)
     .filter((s) => !termo || s.id === servico?.id || `${s.codigo_eap} ${s.nome}`.toLowerCase().includes(termo))
-  const pacotesDoServico = pacotes.filter((p) => p.servico_id === servico?.id && !p.fechado_em)
+  // O pacote vem sozinho (o único que recebe o serviço naquele dia); com mais de um, a pessoa escolhe.
+  const { possiveis, pacoteId } = opcoesDePacote(pacotes, servico?.id, campos.data_prevista, campos.pacote_id)
   const mudar = (k, v) => { setCampos((c) => ({ ...c, [k]: v })); setErro(null) }
 
   function escolherServico(id) {
@@ -78,8 +79,8 @@ export function FolhaAtividade({ aberta, segunda, hoje, servicos, pacotes, ativi
 
   async function salvar() {
     if (conferir && !conferenciaOk(respostas)) { setErro(BLOQUEIO); return }
-    const pacote = pacotes.find((p) => p.id === Number(campos.pacote_id))
-    const v = validarAtividade(campos, { servico, pacote, segunda, hoje, nova: !editando })
+    const pacote = pacotes.find((p) => p.id === pacoteId)
+    const v = validarAtividade(campos, { servico, pacote, pacotes, segunda, hoje, nova: !editando })
     if (v.erro) { setErro(v.erro); return }
     setSalvando(true)
     const r = editando ? await dados.editarAtividade(aberta.atividade.id, v.registro) : await dados.criarAtividades([v.registro])
@@ -135,11 +136,17 @@ export function FolhaAtividade({ aberta, segunda, hoje, servicos, pacotes, ativi
             <input id="equipe-atividade" className="ipt" value={campos.equipe} onChange={(e) => mudar('equipe', e.target.value)} placeholder="Ex.: Eq. Raimundo" />
           </div>
           <div className="campo">
-            <label className="lab" htmlFor="pacote-atividade">Pacote (opcional)</label>
-            <select id="pacote-atividade" className="ipt" value={campos.pacote_id} onChange={(e) => mudar('pacote_id', e.target.value)} disabled={!servico}>
-              <option value="">Sem pacote</option>
-              {pacotesDoServico.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            <label className="lab" htmlFor="pacote-atividade">Pacote</label>
+            <select id="pacote-atividade" className="ipt" value={pacoteId} onChange={(e) => mudar('pacote_id', e.target.value)} disabled={possiveis.length < 2}>
+              {possiveis.length === 0 && <option value="">Sem pacote neste dia</option>}
+              {possiveis.length > 1 && <option value="">— escolha o pacote —</option>}
+              {possiveis.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
             </select>
+            <span className={`meta ${possiveis.length > 1 && !pacoteId ? 'warn' : ''}`}>
+              {possiveis.length === 1 ? 'Ligado sozinho: cada baixa soma no pacote.'
+                : possiveis.length > 1 ? 'Este serviço está em mais de um pacote neste dia: escolha em qual a baixa soma.'
+                  : 'Nenhum pacote aberto tem este serviço neste dia.'}
+            </span>
           </div>
           {erro && <p className="erro-campo" role="alert" style={{ marginBottom: 12 }}>{erro}</p>}
           <div className="folha-acoes">
@@ -156,8 +163,9 @@ export function FolhaAtividade({ aberta, segunda, hoje, servicos, pacotes, ativi
 // Distribuir na semana: para cada serviço previsto ou atrasado (e os que podem ser antecipados),
 // o que falta ÷ os dias de trabalho até o fim previsto, nos dias livres desta semana.
 // aberta: {} ou { foco: id do serviço a antecipar }.
-export function FolhaDistribuir({ aberta, segunda, hoje, linhas, antecipaveis, atividades, producoes, fechar, salvo }) {
+export function FolhaDistribuir({ aberta, segunda, hoje, linhas, antecipaveis, atividades, producoes, pacotes, fechar, salvo }) {
   const [marcados, setMarcados] = useState(new Set())
+  const [escolhas, setEscolhas] = useState({})
   const [respostas, setRespostas] = useState({})
   const [erro, setErro] = useState(null)
   const [salvando, setSalvando] = useState(false)
@@ -165,15 +173,16 @@ export function FolhaDistribuir({ aberta, segunda, hoje, linhas, antecipaveis, a
   const itens = !aberta ? [] : [
     ...linhas.map((l) => ({
       s: l.servico, atraso: l.atraso, antecipar: false,
-      d: distribuirNaSemana(l.servico, { segunda, hoje, producoes, ocupados: l.atividades.map((a) => a.data_prevista) }),
+      d: distribuirNaSemana(l.servico, { segunda, hoje, producoes, pacotes, ocupados: l.atividades.map((a) => a.data_prevista) }),
     })),
-    ...antecipaveis.map((s) => ({ s, atraso: 0, antecipar: true, d: distribuirNaSemana(s, { segunda, hoje, producoes, antecipar: true }) })),
+    ...antecipaveis.map((s) => ({ s, atraso: 0, antecipar: true, d: distribuirNaSemana(s, { segunda, hoje, producoes, pacotes, antecipar: true }) })),
   ].filter((x) => x.d).map((x) => ({ ...x, conferir: precisaConferencia(x.s, atividades) }))
 
   // Ao abrir, vêm marcados os previstos e atrasados que não pedem conferência (e o serviço escolhido para antecipar).
   useAoAbrir(aberta, () => {
     setMarcados(new Set(itens.filter((x) => (!x.antecipar && !x.conferir) || x.s.id === aberta.foco).map((x) => x.s.id)))
     setRespostas({})
+    setEscolhas({})
     setErro(null)
   })
 
@@ -190,7 +199,9 @@ export function FolhaDistribuir({ aberta, segunda, hoje, linhas, antecipaveis, a
 
   async function criar() {
     if (escolhidos.some((x) => !liberado(x))) { setErro(BLOQUEIO); return }
-    const registros = escolhidos.flatMap((x) => x.d.registros)
+    const l = ligarPacotes(escolhidos.flatMap((x) => x.d.registros), pacotes, escolhas)
+    if (l.ambiguos.length) { setErro('Escolha o pacote dos serviços que estão em mais de um pacote.'); return }
+    const registros = l.registros
     setSalvando(true)
     const r = await dados.criarAtividades(registros)
     setSalvando(false)
@@ -224,6 +235,13 @@ export function FolhaDistribuir({ aberta, segunda, hoje, linhas, antecipaveis, a
                 </div>
               </label>
               <div className="linha-qtd num">{quantidade(d.porDia, s.unidade)}<small>/dia</small></div>
+              {d.escolherPacote.length > 0 && marcados.has(s.id) && (
+                <select className="ipt" style={{ width: '100%', marginTop: 6 }} aria-label={`Pacote de ${s.nome}`}
+                  value={escolhas[s.id] || ''} onChange={(e) => { setEscolhas({ ...escolhas, [s.id]: e.target.value }); setErro(null) }}>
+                  <option value="">— em mais de um pacote: escolha —</option>
+                  {d.escolherPacote.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                </select>
+              )}
               {x.conferir && marcados.has(s.id) && (
                 <div style={{ width: '100%' }}>
                   <Conferencia respostas={respostas[s.id]} mudar={(i, v) => { setRespostas({ ...respostas, [s.id]: responder(respostas[s.id] || [], i, v) }); setErro(null) }} />

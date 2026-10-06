@@ -6,8 +6,9 @@ import * as dados from '../lib/dados.js'
 import { pode } from '../lib/permissoes.js'
 import { avancoServico, diasAtraso } from '../lib/avanco.js'
 import { contarMotivos } from '../lib/pcp.js'
+import { pctServicoDoPacote } from '../lib/premio.js'
 import { previaTrocaUnidade, validarAjuste, validarCusto } from '../lib/cronograma.js'
-import { UNIDADES } from '../lib/vocabulario.js'
+import { STATUS_RESTRICAO, UNIDADES } from '../lib/vocabulario.js'
 import { dataBr } from '../lib/datas.js'
 import { moeda, porcento, quantidade } from '../lib/formato.js'
 import { Barra, Cabecalho, Carregando, ErroCaixa, Folha, Secao, Status, useAoAbrir, useAviso, useCarga } from '../components/index.jsx'
@@ -41,6 +42,7 @@ export default function Servico({ goto, params, usuario }) {
   const gestao = pode(usuario.role, 'lancarAjuste')
   const motivos = contarMotivos(atividades.filter((a) => a.servico_id === s.id))
   const deste = (lista) => lista.filter((x) => x.servico_id === s.id)
+  const pacotesDeste = pacotes.filter((p) => p.servicos.some((x) => x.servico_id === s.id))
 
   return (
     <>
@@ -113,12 +115,12 @@ export default function Servico({ goto, params, usuario }) {
             <div className="pares">{motivos.map((m) => <div key={m.motivo}><span>{m.motivo}</span><b className="num">{m.total}</b></div>)}</div>
           </Secao>
           <Secao rotulo="Pacotes">
-            {deste(pacotes).length === 0 && <p className="vazio-curto">Nenhum pacote deste serviço.</p>}
+            {pacotesDeste.length === 0 && <p className="vazio-curto">Nenhum pacote deste serviço.</p>}
             <div className="lista">
-              {deste(pacotes).map((p) => (
+              {pacotesDeste.map((p) => (
                 <button key={p.id} className="linha" onClick={() => goto('pacote', { id: p.id })}>
                   <div className="linha-main"><div className="linha-titulo">{p.nome}</div><div className="meta">{p.status}</div></div>
-                  <div className="linha-qtd num">{porcento((p.quantidade_executada / p.quantidade_meta) * 100, 0)}</div>
+                  <div className="linha-qtd num">{porcento(pctServicoDoPacote(p.servicos.find((x) => x.servico_id === s.id)), 0)}</div>
                 </button>
               ))}
             </div>
@@ -126,7 +128,7 @@ export default function Servico({ goto, params, usuario }) {
           <Secao rotulo="Restrições">
             {deste(restricoes).length === 0 && <p className="vazio-curto">Nenhuma restrição.</p>}
             <div className="pares">
-              {deste(restricoes).map((r) => <div key={r.id}><span>{r.descricao}</span><b className={r.status === 'Pendente' ? 'falta' : ''}>{r.status}</b></div>)}
+              {deste(restricoes).map((r) => <div key={r.id}><span>{r.descricao}</span><b className={r.status === STATUS_RESTRICAO.PENDENTE ? 'falta' : ''}>{r.status}</b></div>)}
             </div>
           </Secao>
         </div>

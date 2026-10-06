@@ -1,6 +1,6 @@
 // Regras do PCP (planejamento da semana). PLANO-DO-PROJETO.md, "4a. PCP".
 
-import { GRUPOS_MOTIVO, ORIGEM_PRODUCAO, STATUS_PCP, STATUS_RESTRICAO, TIPOS_RESTRICAO } from './vocabulario.js'
+import { GRUPOS_MOTIVO, ORIGEM_PRODUCAO, PACOTE, STATUS_PCP, STATUS_RESTRICAO, TIPOS_RESTRICAO } from './vocabulario.js'
 import { diasDaSemana, diasEntre, diasUteisEntre, inicioDoMesAnterior, segundaDaSemana, somarDias } from './datas.js'
 import { diasAtraso } from './avanco.js'
 import { arredondar as arredondarCasas, lerNumero } from './formato.js'
@@ -133,9 +133,46 @@ const arredondar = (v, unidade) => {
   return Math.max(1 / 10 ** casas, arredondarCasas(v, casas))
 }
 
+// ── Pacote da atividade ────────────────────────────────────────────────────
+// A atividade entra sozinha no pacote que recebe a produção do serviço naquele dia: aberto, não pausado, com
+// o serviço e com o dia dentro do período. Com mais de um possível, a pessoa escolhe. A mesma regra roda no
+// banco (pacote_unico, usada pela baixa e ao salvar o pacote): mudou uma, mude a outra.
+// Pacote pausado só recebe os dias ANTES da pausa (o que foi feito antes de parar conta para o proporcional).
+export const pacotesPara = (pacotes, servicoId, data) => pacotes.filter((p) => !p.fechado_em
+  && (p.status !== PACOTE.PAUSADO || data < p.pausa_desde)
+  && p.data_inicio <= data && data <= p.data_fechamento && p.servicos.some((s) => s.servico_id === servicoId))
+
+// Para o campo Pacote da atividade: os pacotes possíveis no dia e o que fica escolhido (o escolhido, se ainda
+// for possível; senão o único possível; com dois ou mais e nenhum escolhido, '').
+export function opcoesDePacote(pacotes, servicoId, data, escolhido) {
+  const possiveis = servicoId && data ? pacotesPara(pacotes, servicoId, data) : []
+  const valido = possiveis.find((p) => p.id === Number(escolhido))
+  return { possiveis, pacoteId: valido ? valido.id : possiveis.length === 1 ? possiveis[0].id : '' }
+}
+
+// Aviso na baixa: atividade sem pacote cujo serviço está em mais de um pacote no dia não soma em nenhum.
+export const avisoPacoteDaBaixa = (atividade, pacotes) => (!atividade.pacote_id && pacotesPara(pacotes, atividade.servico_id, atividade.data_prevista).length > 1
+  ? 'Este serviço está em mais de um pacote neste dia e a atividade não tem pacote: a baixa não soma em nenhum. Peça ao engenheiro para escolher o pacote na atividade.'
+  : null)
+
+// Liga cada registro de atividade ao seu pacote. Preferência: escolhas[servico_id] e depois o pacote que o registro
+// já tem, se ainda for possível naquele dia. Devolve { registros, ambiguos: [servico_id] } — ambíguo fica sem pacote.
+export function ligarPacotes(registros, pacotes, escolhas = {}) {
+  const ambiguos = new Set()
+  const ligados = registros.map((r) => {
+    const opcoes = pacotesPara(pacotes, r.servico_id, r.data_prevista)
+    const preferido = [escolhas[r.servico_id], r.pacote_id].map(Number).find((id) => opcoes.some((p) => p.id === id))
+    if (preferido) return { ...r, pacote_id: preferido }
+    if (opcoes.length > 1) ambiguos.add(r.servico_id)
+    return { ...r, pacote_id: opcoes.length === 1 ? opcoes[0].id : null }
+  })
+  return { registros: ligados, ambiguos: [...ambiguos] }
+}
+
 // Atividade nova ou editada (PRD-FRONTEND, "Campos da atividade"). Devolve { registro } ou { erro }.
 // Atividade nova só de hoje em diante (o banco confere o mesmo na política pcp_criar).
-export function validarAtividade(campos, { servico, pacote, segunda, hoje, nova }) {
+// pacote: o escolhido na tela (só conta se for possível naquele dia); sem escolha, entra no único possível.
+export function validarAtividade(campos, { servico, pacote, pacotes = [], segunda, hoje, nova }) {
   if (!servico) return { erro: 'Escolha o serviço.' }
   if (servico.e_resumo || servico.cancelado) return { erro: 'Esse serviço não recebe atividade.' }
   const d = campos.data_prevista
@@ -144,13 +181,14 @@ export function validarAtividade(campos, { servico, pacote, segunda, hoje, nova 
   if (!campos.local?.trim()) return { erro: 'Informe o local.' }
   const q = lerNumero(campos.quantidade_planejada)
   if (!(q > 0)) return { erro: 'Informe a quantidade planejada.' }
-  if (pacote && (pacote.servico_id !== servico.id || pacote.fechado_em)) return { erro: 'Esse pacote não é deste serviço ou já foi fechado.' }
-  return {
-    registro: {
-      semana_inicio: segunda, data_prevista: d, servico_id: servico.id, local: campos.local.trim(),
-      quantidade_planejada: q, equipe: campos.equipe?.trim() || null, pacote_id: pacote?.id ?? null,
-    },
+  if (pacote && !pacotesPara([pacote], servico.id, d).length) return { erro: 'Esse pacote não tem este serviço neste dia, está pausado ou já foi fechado.' }
+  const registro = {
+    semana_inicio: segunda, data_prevista: d, servico_id: servico.id, local: campos.local.trim(),
+    quantidade_planejada: q, equipe: campos.equipe?.trim() || null, pacote_id: pacote?.id ?? null,
   }
+  const ligado = ligarPacotes([registro], pacote ? [pacote, ...pacotes] : pacotes)
+  if (ligado.ambiguos.length) return { erro: 'Este serviço está em mais de um pacote neste dia: escolha o pacote.' }
+  return { registro: ligado.registros[0] }
 }
 
 // A semana é o cronograma recortado em seis dias: cada serviço previsto (e cada atrasado que ainda
@@ -251,20 +289,21 @@ export function ritmoDaSemana(s, { segunda, hoje, producoes, antecipar = false }
 // Reparte o que falta do serviço pelos dias livres desta semana (sem atividade dele, a partir de hoje
 // e do início previsto). Por dia = o que falta ÷ dias de trabalho até o fim previsto; se o fim
 // previsto já passou, o que falta tem de caber nesta semana. antecipar: começa antes do previsto.
+// Cada dia entra no pacote do serviço (ligarPacotes); escolherPacote: os pacotes possíveis quando há mais de um.
 // Devolve null se não há o que distribuir.
-export function distribuirNaSemana(s, { segunda, hoje, producoes, ocupados = [], antecipar = false }) {
+export function distribuirNaSemana(s, { segunda, hoje, producoes, ocupados = [], antecipar = false, pacotes = [] }) {
   const r = ritmoDaSemana(s, { segunda, hoje, producoes, antecipar })
   if (r.saldo <= 0) return null
   const dias = diasDaSemana(segunda).filter((d) => d >= r.primeiro && (r.prazoVencido || d <= s.fim_previsto) && !ocupados.includes(d))
   if (dias.length === 0) return null
   const { necessario, referencia, base, irreal, prazoVencido } = r
-  return {
-    dias, porDia: arredondar(necessario, s.unidade), necessario, referencia, base, irreal, prazoVencido,
-    registros: dias.map((d) => ({
-      semana_inicio: segunda, data_prevista: d, servico_id: s.id, local: s.local || 'A definir',
-      quantidade_planejada: arredondar(necessario, s.unidade), equipe: null, pacote_id: null,
-    })),
-  }
+  const ligado = ligarPacotes(dias.map((d) => ({
+    semana_inicio: segunda, data_prevista: d, servico_id: s.id, local: s.local || 'A definir',
+    quantidade_planejada: arredondar(necessario, s.unidade), equipe: null, pacote_id: null,
+  })), pacotes)
+  const escolherPacote = ligado.ambiguos.length
+    ? pacotes.filter((p) => dias.some((d) => pacotesPara([p], s.id, d).length)) : []
+  return { dias, porDia: arredondar(necessario, s.unidade), necessario, referencia, base, irreal, prazoVencido, registros: ligado.registros, escolherPacote }
 }
 
 // Pode antecipar: ainda não começou, começa nas próximas SEMANAS_ANTECIPAR semanas, não tem restrição
@@ -298,22 +337,20 @@ export const precisaConferencia = (s, atividades) => !comecou(s) && !atividades.
 export const conferenciaOk = (respostas) => CONFERENCIA_INICIO.every((_, i) => respostas?.[i] === true)
 
 // "Copiar pendentes para a próxima semana": cada Não concluída vira uma atividade no mesmo dia da
-// semana seguinte, com o saldo. Pacote fechado no meio do caminho fica de fora. Não copia duas vezes.
+// semana seguinte, com o saldo. Fica no mesmo pacote se ele ainda recebe aquele dia; senão, vai para o pacote
+// possível (ligarPacotes; com dois possíveis, fica sem pacote até alguém escolher). Não copia duas vezes.
 // Cópia que cairia num dia que já passou não é criada (planejar é de hoje em diante).
 export function copiarPendentes(atividades, pacotes, segunda, hoje) {
   const jaCopiadas = new Set(atividades.map((a) => a.copiada_de_id).filter(Boolean))
-  return atividades
+  const copias = atividades
     .filter((a) => a.semana_inicio === segunda && a.status === STATUS_PCP.NAO_CONCLUIDA && !jaCopiadas.has(a.id))
     .filter((a) => saldoPendente(a) > 0)
-    .map((a) => {
-      const pacote = pacotes.find((p) => p.id === a.pacote_id)
-      return {
-        semana_inicio: somarDias(segunda, 7), data_prevista: somarDias(a.data_prevista, 7), servico_id: a.servico_id,
-        local: a.local, quantidade_planejada: saldoPendente(a), equipe: a.equipe,
-        pacote_id: pacote && !pacote.fechado_em ? pacote.id : null, copiada_de_id: a.id,
-      }
-    })
+    .map((a) => ({
+      semana_inicio: somarDias(segunda, 7), data_prevista: somarDias(a.data_prevista, 7), servico_id: a.servico_id,
+      local: a.local, quantidade_planejada: saldoPendente(a), equipe: a.equipe, pacote_id: a.pacote_id, copiada_de_id: a.id,
+    }))
     .filter((c) => c.data_prevista >= hoje)
+  return ligarPacotes(copias, pacotes).registros
 }
 
 // ── Restrições (plano de 3 meses) ──────────────────────────────────────────

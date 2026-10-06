@@ -7,14 +7,15 @@ import { useObra } from '../lib/ObraContext.jsx'
 import * as dados from '../lib/dados.js'
 import { pode } from '../lib/permissoes.js'
 import {
-  acumuladosDaSemana, ppcAte, copiarPendentes, grupoDoMotivo, motivosPorGrupo, linhasDaSemana, mestrePodeAlterar, podeAntecipar,
-  equipeDaAtividade, META_PPC, ppcPorSemana, previaBaixa, ritmoDaSemana, SEMANAS_ANTECIPAR, tomPpc,
+  acumuladosDaSemana, ppcAte, copiarPendentes, motivosPorGrupo, linhasDaSemana, mestrePodeAlterar, podeAntecipar,
+  avisoPacoteDaBaixa, equipeDaAtividade, META_PPC, ppcPorSemana, previaBaixa, ritmoDaSemana, SEMANAS_ANTECIPAR, tomPpc,
 } from '../lib/pcp.js'
 import { avancoServico } from '../lib/avanco.js'
 import { dataBr, diasDaSemana, diaMes, inicioDoMesAnterior, nomeDia, nomeMes, segundaDaSemana, somarDias } from '../lib/datas.js'
 import { arredondar, porcento, quantidade } from '../lib/formato.js'
 import { GRUPOS_MOTIVO, PERFIS, STATUS_PCP } from '../lib/vocabulario.js'
 import { Barra, Caixa, Carregando, ErroCaixa, Folha, Icone, Pizza, Secao, Status, useAoAbrir, useAviso, useCarga } from '../components/index.jsx'
+import { EscolherMotivo } from '../components/motivo.jsx'
 import { FolhaAtividade, FolhaDistribuir } from './atividade.jsx'
 
 // Cor de cada grupo macro no gráfico de pizza, na ordem de GRUPOS_MOTIVO (renomear um grupo não tira a cor).
@@ -295,7 +296,7 @@ export default function Semana({ usuario, params = {} }) {
 
       <FolhaAtividade aberta={folha} segunda={segunda} hoje={dia} servicos={data.servicos} pacotes={data.pacotes} atividades={data.atividades}
         fechar={() => setFolha(null)} salvo={salvo} />
-      <FolhaDistribuir aberta={distribuir} segunda={segunda} hoje={dia} linhas={linhas} antecipaveis={antecipaveis}
+      <FolhaDistribuir aberta={distribuir} segunda={segunda} hoje={dia} linhas={linhas} antecipaveis={antecipaveis} pacotes={data.pacotes}
         atividades={data.atividades} producoes={data.producoes} fechar={() => setDistribuir(null)} salvo={salvo} />
       <Folha aberta={!!copiar} fechar={() => setCopiar(null)} rotulo="Copiar pendentes">
         {copiar && (
@@ -319,7 +320,7 @@ export default function Semana({ usuario, params = {} }) {
         )}
       </Folha>
 
-      <JanelaBaixa atividade={baixa} servico={baixa && servico(baixa.servico_id)} fechar={() => setBaixa(null)} salvo={salvo}
+      <JanelaBaixa atividade={baixa} servico={baixa && servico(baixa.servico_id)} pacotes={data.pacotes} fechar={() => setBaixa(null)} salvo={salvo}
         editar={gestao ? (a) => { setBaixa(null); setFolha({ atividade: a }) } : null} />
     </>
   )
@@ -342,11 +343,10 @@ function Acumulados({ servico: s, producoes, segunda }) {
 
 // Baixa: quanto foi feito, qual equipe fez e, se não atingiu o programado do dia, o motivo.
 // editar: Engenheiro e Coordenador também editam/excluem daqui a atividade ainda planejada.
-export function JanelaBaixa({ atividade, servico, fechar, salvo, editar = null }) {
+export function JanelaBaixa({ atividade, servico, pacotes = [], fechar, salvo, editar = null }) {
   const [executada, setExecutada] = useState('')
   const [equipe, setEquipe] = useState('')
   const [motivo, setMotivo] = useState(null)
-  const [grupo, setGrupo] = useState(null)
   const [erro, setErro] = useState(null)
   const [salvando, setSalvando] = useState(false)
 
@@ -355,7 +355,6 @@ export function JanelaBaixa({ atividade, servico, fechar, salvo, editar = null }
     setExecutada(String(atividade.quantidade_executada ?? atividade.quantidade_planejada))
     setEquipe(equipeDaAtividade(atividade) || '')
     setMotivo(atividade.motivo_nao_conclusao)
-    setGrupo(atividade.motivo_nao_conclusao ? grupoDoMotivo(atividade.motivo_nao_conclusao) : null)
     setErro(null)
   })
 
@@ -384,6 +383,7 @@ export function JanelaBaixa({ atividade, servico, fechar, salvo, editar = null }
           <div className="lab">Dar baixa · {nomeDia(atividade.data_prevista)} {diaMes(atividade.data_prevista)}</div>
           <h2>{servico?.nome}</h2>
           <div className="sub">{atividade.local} · programado para o dia <b>{quantidade(atividade.quantidade_planejada, servico?.unidade)}</b></div>
+          {avisoPacoteDaBaixa(atividade, pacotes) && <p className="meta warn" style={{ marginBottom: 12 }}>{avisoPacoteDaBaixa(atividade, pacotes)}</p>}
           <div className="campo">
             <label className="lab" htmlFor="executada">Quanto foi executado?</label>
             <div className="qtd-ipt">
@@ -399,22 +399,7 @@ export function JanelaBaixa({ atividade, servico, fechar, salvo, editar = null }
           </div>
           {naoConclui && (
             <div className="campo">
-              <span className="lab">Por que não atingiu? Escolha o grupo</span>
-              <div className="opcoes grupos">
-                {Object.keys(GRUPOS_MOTIVO).map((g) => (
-                  <button key={g} type="button" aria-pressed={grupo === g} onClick={() => { setGrupo(g); setMotivo(GRUPOS_MOTIVO[g].length === 1 ? GRUPOS_MOTIVO[g][0] : null); setErro(null) }}>{g}</button>
-                ))}
-              </div>
-              {grupo && GRUPOS_MOTIVO[grupo].length > 1 && (
-                <>
-                  <span className="lab" style={{ marginTop: 8 }}>Qual a causa?</span>
-                  <div className="opcoes">
-                    {GRUPOS_MOTIVO[grupo].map((m) => (
-                      <button key={m} type="button" aria-pressed={motivo === m} onClick={() => { setMotivo(m); setErro(null) }}>{m}</button>
-                    ))}
-                  </div>
-                </>
-              )}
+              <EscolherMotivo key={atividade.id} motivo={motivo} mudar={(m) => { setMotivo(m); setErro(null) }} />
             </div>
           )}
           {erro && <p className="erro-campo" role="alert" style={{ marginBottom: 12 }}>{erro}</p>}

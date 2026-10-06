@@ -33,7 +33,11 @@ export const STATUS_PCP = { PLANEJADA: 'Planejada', CONCLUIDA: 'Concluída', NAO
 
 export const ORIGEM_PRODUCAO = { PCP: 'PCP', AJUSTE: 'Ajuste' }
 
-export const STATUS_PACOTE = ['Planejado', 'Liberado', 'Em execução', 'Concluído', 'Não concluído']
+export const PACOTE = { PLANEJADO: 'Planejado', LIBERADO: 'Liberado', EM_EXECUCAO: 'Em execução', PAUSADO: 'Pausado', CONCLUIDO: 'Concluído', NAO_CONCLUIDO: 'Não concluído' }
+export const STATUS_PACOTE = [PACOTE.PLANEJADO, PACOTE.LIBERADO, PACOTE.EM_EXECUCAO, PACOTE.PAUSADO, PACOTE.CONCLUIDO, PACOTE.NAO_CONCLUIDO]
+// À mão o pacote só anda entre estes; Pausado sai de "Pausar" (com o problema), Concluído / Não concluído do
+// fechamento da folha.
+export const STATUS_PACOTE_MANUAL = [PACOTE.PLANEJADO, PACOTE.LIBERADO, PACOTE.EM_EXECUCAO]
 
 export const TIPOS_RESTRICAO = ['Material', 'Projeto', 'Equipe', 'Equipamento', 'Liberação de área', 'Segurança', 'Outro']
 
@@ -46,7 +50,14 @@ export const FUNCOES = [
 
 export const TIPOS_MAO_OBRA = ['Direta', 'Indireta', 'Terceirizada']
 
-export const SITUACOES = ['Presente', 'Falta', 'Atestado', 'Afastado']
+// Só mão de obra própria recebe prêmio de pacote (terceirizado nunca; fechar_pacotes usa o mesmo).
+export const TIPOS_COM_PREMIO = ['Direta', 'Indireta']
+
+// No prêmio do pacote, estas funções recebem da MO ajudante; as demais, da MO profissional (fechar_pacotes usa o mesmo).
+export const FUNCOES_AJUDANTE = ['Servente']
+
+export const PRESENTE = 'Presente'
+export const SITUACOES = [PRESENTE, 'Falta', 'Atestado', 'Afastado']
 
 export const OCORRENCIA_ABERTA = 'Aberta'
 
