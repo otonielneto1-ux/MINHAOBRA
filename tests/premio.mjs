@@ -176,6 +176,12 @@ conferir('levar equipe: sem destino não troca', validarRemanejo({ destino: '', 
 conferir('levar equipe: destino pausado recusa', validarRemanejo({ destino: '20', colaboradores: [1], data: '2026-10-08' }, destinos, pausado).erro, 'Escolha um pacote aberto e não pausado.')
 conferir('levar equipe: ninguém escolhido recusa', validarRemanejo({ destino: '10', colaboradores: [], data: '2026-10-08' }, destinos, pausado).erro, 'Escolha quem vai para o outro pacote.')
 conferir('levar equipe válido', validarRemanejo({ destino: '10', colaboradores: [1, 2], data: '2026-10-08' }, destinos, pausado), { destino: 10, colaboradores: [1, 2], data: '2026-10-08' })
+conferir('levar equipe antes do dia da pausa recusa (como o banco)', validarRemanejo({ destino: '10', colaboradores: [1], data: '2026-10-07' }, destinos, pausado).erro,
+  'A equipe só sai do pacote pausado a partir do dia da pausa.')
+const aPausar = { ...pausado, status: 'Em execução', pausa_desde: null, pausa_motivo: null }
+conferir('pausar e levar: entrada antes da pausa lançada junto recusa', validarRemanejo({ destino: '10', colaboradores: [1], data: '2026-10-08', pausa: '2026-10-09' }, destinos, aPausar).erro,
+  'A equipe só sai do pacote pausado a partir do dia da pausa.')
+conferir('pausar e levar: entrada no dia da pausa vale', validarRemanejo({ destino: '10', colaboradores: [1], data: '2026-10-09', pausa: '2026-10-09' }, destinos, aPausar), { destino: 10, colaboradores: [1], data: '2026-10-09' })
 
 // ── % pago sobre o orçamento ──
 conferir('prêmio real = MO orçada × %', premioReal({ pct_pago: 30, servicos: [ps(22, 1, 0, 1200, 600)] }), { profissional: 360, ajudante: 180, total: 540 })

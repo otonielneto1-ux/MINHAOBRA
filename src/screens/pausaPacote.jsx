@@ -31,7 +31,7 @@ export function FolhaPausa({ aberta, pacote: p, pacotes, funcionarios, hoje, fec
   async function salvar() {
     const pausa = levar ? null : validarPausa(campos, p, hoje)
     if (pausa?.erro) { setErro(pausa.erro); return }
-    const troca = validarRemanejo({ destino: campos.destino, colaboradores: campos.colaboradores, data: campos.entrada }, pacotes, p, levar)
+    const troca = validarRemanejo({ destino: campos.destino, colaboradores: campos.colaboradores, data: campos.entrada, pausa: pausa?.data }, pacotes, p, levar)
     if (troca?.erro) { setErro(troca.erro); return }
     setSalvando(true)
     // Pausar e levar a equipe vão juntos ao banco (tudo ou nada).
@@ -71,7 +71,7 @@ export function FolhaPausa({ aberta, pacote: p, pacotes, funcionarios, hoje, fec
         <>
           <div className="campo" style={{ maxWidth: 220 }}>
             <label className="lab" htmlFor="entrada-pacote">Entra no outro pacote em</label>
-            <input id="entrada-pacote" type="date" className="ipt" value={campos.entrada} onChange={(e) => mudar('entrada', e.target.value)} />
+            <input id="entrada-pacote" type="date" className="ipt" min={levar ? p.pausa_desde : campos.data} value={campos.entrada} onChange={(e) => mudar('entrada', e.target.value)} />
             <span className="meta">Quem entra depois do início recebe proporcional aos dias úteis no pacote.</span>
           </div>
           <div className="campo">
